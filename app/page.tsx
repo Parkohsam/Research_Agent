@@ -14,14 +14,14 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <Link
             href="/login"
-            className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900"
+            className="px-5 py-2.5 text-bold font-medium text-gray-700 hover:text-gray-900"
           >
             Log in
           </Link>
 
           <Link
             href="/signup"
-            className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition"
+            className="px-5 py-2.5 text-bold font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition"
           >
             Sign up
           </Link>
