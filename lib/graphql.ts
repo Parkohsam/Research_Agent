@@ -34,6 +34,13 @@ export async function graphqlRequest<T>(
         const result: GraphQLResponse<T> =
             await response.json();
 
+        if (!response.ok) {
+            throw new Error(
+                result.errors?.[0]?.message ||
+                    `Server error: ${response.status}`
+            );
+        }
+
         if (result.errors && result.errors.length > 0) {
             throw new Error(result.errors[0].message);
         }
@@ -366,6 +373,39 @@ export async function getResearchPapers(
 
     return graphqlRequest<ResearchPapersResponse>(
         query,
+        {
+            researchId,
+        },
+        {
+            Authorization: `Bearer ${token}`,
+        }
+    );
+}
+
+/* ---------------------------------- */
+/* Delete Research                    */
+/* ---------------------------------- */
+
+export type DeleteResearchResponse = {
+    deleteResearch: boolean;
+};
+
+export async function deleteResearch(
+    researchId: string,
+    token: string
+) {
+    const mutation = `
+        mutation DeleteResearch(
+            $researchId: ID!
+        ) {
+            deleteResearch(
+                researchId: $researchId
+            )
+        }
+    `;
+
+    return graphqlRequest<DeleteResearchResponse>(
+        mutation,
         {
             researchId,
         },

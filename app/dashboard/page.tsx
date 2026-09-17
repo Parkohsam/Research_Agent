@@ -3,442 +3,500 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-    createResearch,
-    getCurrentUser,
-    getMyResearch,
-    getResearchPapers,
-    searchResearchPapers,
-    type Paper,
-    type Research,
-} from "@/lib/graphql";
-
 import Sidebar from "../components/dashboard/Sidebar";
 import ResearchInput from "../components/dashboard/ResearchInput";
 import ResearchSuggestions from "../components/dashboard/ResearchSuggestions";
 
+import {
+    getCurrentUser,
+    getMyResearch,
+    getResearchPapers,
+    createResearch,
+    searchResearchPapers,
+    deleteResearch,
+    type Research,
+    type Paper,
+} from "@/lib/graphql";
+
 export default function DashboardPage() {
     const router = useRouter();
 
-    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-    const [isLoadingResearch, setIsLoadingResearch] =
-        useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const [researchList, setResearchList] = useState<Research[]>(
-        []
-    );
-
-    const [researchTopic, setResearchTopic] = useState("");
-    const [submittedTopic, setSubmittedTopic] = useState("");
-
+    const [researchList, setResearchList] = useState<Research[]>([]);
     const [currentResearch, setCurrentResearch] =
         useState<Research | null>(null);
 
-    const [papersFound, setPapersFound] = useState<number | null>(
-        null
-    );
-
     const [papers, setPapers] = useState<Paper[]>([]);
+    const [topic, setTopic] = useState("");
+    const [submittedTopic, setSubmittedTopic] = useState("");
+
+    const [userName, setUserName] = useState("");
+    const [topicError, setTopicError] = useState("");
+
+    const [loading, setLoading] = useState(false);
+    const [papersLoading, setPapersLoading] = useState(false);
+
+    const [papersFound, setPapersFound] = useState(0);
+
+    /* ---------------------------------- */
+    /* Load User and Research History     */
+    /* ---------------------------------- */
 
     useEffect(() => {
-        const verifyAuthentication = async () => {
+        const loadDashboard = async () => {
             const token = localStorage.getItem("token");
 
             if (!token) {
-                setIsCheckingAuth(false);
-                router.replace("/login");
+                router.push("/login");
                 return;
             }
 
             try {
-                await getCurrentUser(token);
+                const userResponse = await getCurrentUser(token);
 
-                setIsLoadingResearch(true);
+                setUserName(userResponse.me.name);
 
-                const response = await getMyResearch(token);
+                const researchResponse = await getMyResearch(
+                    token
+                );
 
-                setResearchList(response.myResearch);
-
-                setIsCheckingAuth(false);
+                setResearchList(
+                    researchResponse.myResearch
+                );
             } catch (error) {
                 console.error(
-                    "Authentication or research loading failed:",
+                    "Failed to load dashboard:",
                     error
                 );
 
                 localStorage.removeItem("token");
-                localStorage.removeItem("user");
-
-                setIsCheckingAuth(false);
-                router.replace("/login");
-            } finally {
-                setIsLoadingResearch(false);
+                router.push("/login");
             }
         };
 
-        verifyAuthentication();
+        loadDashboard();
     }, [router]);
 
-    function handleNewResearch() {
-        setResearchTopic("");
-        setSubmittedTopic("");
-        setCurrentResearch(null);
-        setPapersFound(null);
-        setPapers([]);
-    }
+    /* ---------------------------------- */
+    /* New Research                       */
+    /* ---------------------------------- */
 
-    async function handleSelectResearch(research: Research) {
+    const handleNewResearch = () => {
+        setCurrentResearch(null);
+        setPapers([]);
+        setPapersFound(0);
+        setTopic("");
+        setSubmittedTopic("");
+        setTopicError("");
+    };
+
+    /* ---------------------------------- */
+    /* Select Existing Research           */
+    /* ---------------------------------- */
+
+    const handleSelectResearch = async (
+        research: Research
+    ) => {
         const token = localStorage.getItem("token");
 
         if (!token) {
-            router.replace("/login");
+            router.push("/login");
             return;
         }
 
-        try {
-            setCurrentResearch(research);
-            setResearchTopic("");
-            setSubmittedTopic(research.title);
-            setPapersFound(null);
-            setPapers([]);
+        setCurrentResearch(research);
+        setSubmittedTopic(research.title);
+        setTopicError("");
+        setPapersLoading(true);
 
+        try {
             const response = await getResearchPapers(
                 research.id,
                 token
             );
 
             setPapers(response.researchPapers);
-            setPapersFound(response.researchPapers.length);
+            setPapersFound(
+                response.researchPapers.length
+            );
         } catch (error) {
             console.error(
                 "Failed to load research papers:",
                 error
             );
 
-            alert(
+            setTopicError(
                 error instanceof Error
                     ? error.message
-                    : "Unable to load research papers."
+                    : "Failed to load research papers."
             );
+        } finally {
+            setPapersLoading(false);
         }
-    }
+    };
 
-    async function handleSubmit() {
-        const trimmedTopic = researchTopic.trim();
+    /* ---------------------------------- */
+    /* Submit New Research                */
+    /* ---------------------------------- */
 
-        if (!trimmedTopic || isSubmitting) {
+    const handleSubmit = async () => {
+        const trimmedTopic = topic.trim();
+
+        if (!trimmedTopic) {
+            setTopicError(
+                "Please enter an academic research topic."
+            );
+            return;
+        }
+
+        const normalizedTopic = trimmedTopic
+            .toLowerCase()
+            .replace(/[!?.,]+$/g, "")
+            .trim();
+
+        const conversationalMessages = [
+            "hi",
+            "hello",
+            "hey",
+            "good morning",
+            "good afternoon",
+            "good evening",
+            "how are you",
+            "how are you doing",
+            "thanks",
+            "thank you",
+            "help",
+        ];
+
+        if (
+            conversationalMessages.includes(
+                normalizedTopic
+            )
+        ) {
+            setTopicError(
+                "Please enter an academic research topic, not a greeting or ordinary message."
+            );
+            return;
+        }
+
+        if (trimmedTopic.length < 8) {
+            setTopicError(
+                "Please enter a more descriptive research topic."
+            );
             return;
         }
 
         const token = localStorage.getItem("token");
 
         if (!token) {
-            router.replace("/login");
+            router.push("/login");
             return;
         }
 
-        try {
-            setIsSubmitting(true);
-            setPapersFound(null);
-            setPapers([]);
+        setLoading(true);
+        setTopicError("");
+        setPapers([]);
+        setPapersFound(0);
+        setCurrentResearch(null);
+        setSubmittedTopic(trimmedTopic);
 
-            // Step 1: Create the research record
-            const createResponse = await createResearch(
+        try {
+            const researchResponse = await createResearch(
                 trimmedTopic,
                 token
             );
 
-            const newResearch = createResponse.createResearch;
+            const newResearch =
+                researchResponse.createResearch;
 
-            // Show the newly created research immediately
-            setResearchList((previousResearch) => [
-                newResearch,
-                ...previousResearch,
-            ]);
-
-            setSubmittedTopic(newResearch.title);
             setCurrentResearch(newResearch);
-            setResearchTopic("");
 
-            // Step 2: Search OpenAlex and save real papers
-            const searchResponse = await searchResearchPapers(
-                newResearch.id,
-                token
+            const searchResponse =
+                await searchResearchPapers(
+                    newResearch.id,
+                    token
+                );
+
+            setPapersFound(
+                searchResponse.searchResearchPapers.totalFound
             );
 
-            const totalFound =
-                searchResponse.searchResearchPapers.totalFound;
-
-            setPapersFound(totalFound);
-
-            // Step 3: Fetch the saved papers
-            const papersResponse = await getResearchPapers(
-                newResearch.id,
-                token
-            );
+            const papersResponse =
+                await getResearchPapers(
+                    newResearch.id,
+                    token
+                );
 
             setPapers(papersResponse.researchPapers);
 
-            // Step 4: Refresh the research list
-            const refreshedResearch = await getMyResearch(
-                token
+            const updatedResearchResponse =
+                await getMyResearch(token);
+
+            setResearchList(
+                updatedResearchResponse.myResearch
             );
-
-            setResearchList(refreshedResearch.myResearch);
-
-            const updatedResearch =
-                refreshedResearch.myResearch.find(
-                    (research) =>
-                        research.id === newResearch.id
-                );
-
-            if (updatedResearch) {
-                setCurrentResearch(updatedResearch);
-            }
         } catch (error) {
             console.error(
-                "Research creation or paper search failed:",
+                "Failed to create research:",
                 error
             );
 
-            if (error instanceof Error) {
-                alert(error.message);
-            } else {
-                alert(
-                    "Unable to create research or search academic papers. Please try again."
-                );
-            }
+            setTopicError(
+                error instanceof Error
+                    ? error.message
+                    : "Something went wrong while creating your research."
+            );
         } finally {
-            setIsSubmitting(false);
+            setLoading(false);
         }
-    }
+    };
 
-    if (isCheckingAuth) {
-        return (
-            <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <p className="text-gray-600">
-                    Checking authentication...
-                </p>
-            </main>
-        );
-    }
+    /* ---------------------------------- */
+    /* Delete Research                    */
+    /* ---------------------------------- */
+
+    const handleDeleteResearch = async (
+        research: Research
+    ) => {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            router.push("/login");
+            return;
+        }
+
+        try {
+            await deleteResearch(research.id, token);
+
+            setResearchList((previousResearch) =>
+                previousResearch.filter(
+                    (item) => item.id !== research.id
+                )
+            );
+
+            if (
+                currentResearch &&
+                currentResearch.id === research.id
+            ) {
+                setCurrentResearch(null);
+                setPapers([]);
+                setPapersFound(0);
+                setSubmittedTopic("");
+                setTopic("");
+            }
+
+            setTopicError("");
+        } catch (error) {
+            console.error(
+                "Failed to delete research:",
+                error
+            );
+
+            setTopicError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to delete research."
+            );
+        }
+    };
 
     return (
-        <main className="h-screen overflow-hidden bg-gray-50 flex">
-            {/* Sidebar */}
+        <div className="flex min-h-screen bg-gray-50">
             <Sidebar
                 researchList={researchList}
                 onNewResearch={handleNewResearch}
                 onSelectResearch={handleSelectResearch}
+                onDeleteResearch={handleDeleteResearch}
+                userName={userName}
             />
 
-            {/* Main workspace */}
-            <section className="flex-1 min-w-0 min-h-0 flex flex-col">
+            <main className="flex-1">
                 {/* Header */}
-                <header className="sticky top-0 z-40 h-16 shrink-0 bg-white border-b border-gray-200 flex items-center px-6 md:px-8">
-                    <h2 className="font-semibold text-black ml-12 md:ml-0">
+                <header className="border-b border-gray-200 bg-white px-8 py-5">
+                    <h1 className="text-xl font-semibold text-gray-900">
                         {currentResearch
                             ? currentResearch.title
                             : "New Research"}
-                    </h2>
+                    </h1>
+
+                    <p className="mt-1 text-sm text-gray-500">
+                        Discover and explore academic research papers.
+                    </p>
                 </header>
 
-                {/* Workspace */}
-                <div className="min-h-0 flex-1 flex flex-col items-center px-4 sm:px-6 py-10 overflow-y-auto">
-                    <div className="w-full max-w-3xl">
-                        {/* New research state */}
-                        {!submittedTopic && (
-                            <div className="text-center mb-10 mt-10">
-                                <h1 className="text-3xl sm:text-4xl font-bold text-black">
-                                    What are you researching?
-                                </h1>
+                <div className="mx-auto max-w-5xl px-8 py-8">
+                    {/* Submitted Topic */}
+                    {submittedTopic && (
+                        <div className="mb-6">
+                            <p className="mb-2 text-sm font-medium text-gray-700">
+                                Research topic
+                            </p>
 
-                                <p className="mt-4 text-black text-base sm:text-lg">
-                                    Ask ResearchAI to discover and
-                                    evaluate academic literature.
-                                </p>
+                            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
+                                {submittedTopic}
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        {/* Saved research loading message */}
-                        {isLoadingResearch && (
-                            <div className="mb-6 text-center">
-                                <p className="text-sm text-gray-600">
-                                    Loading your research...
-                                </p>
-                            </div>
-                        )}
+                    {/* Error Message */}
+                    {topicError && (
+                        <div className="mb-5 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            <span>⚠️</span>
+                            <p>{topicError}</p>
+                        </div>
+                    )}
 
-                        {/* Submitted research */}
-                        {submittedTopic && (
-                            <div className="mb-8">
-                                <div className="flex justify-end">
-                                    <div className="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-br-md px-5 py-3">
-                                        <p>{submittedTopic}</p>
-                                    </div>
-                                </div>
+                    {/* Research Input */}
+                    <ResearchInput
+                        topic={topic}
+                        setTopic={(value: string) => {
+                            setTopic(value);
+                            setTopicError("");
+                        }}
+                        onSubmit={handleSubmit}
+                        loading={loading}
+                    />
 
-                                <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-5">
-                                    <p className="text-sm font-medium text-black">
-                                        ResearchAI
-                                    </p>
+                    {/* Suggestions */}
+                    {!submittedTopic && (
+                        <ResearchSuggestions
+                            onSelectSuggestion={(suggestion: string) => {
+                                setTopic(suggestion);
+                                setTopicError("");
+                            }}
+                        />
+                    )}
 
-                                    <p className="mt-2 text-sm text-black">
-                                        {isSubmitting
-                                            ? "Searching academic databases and saving real papers..."
-                                            : papersFound !== null
-                                              ? `Research completed. ${papersFound} academic papers were found and saved.`
-                                              : "Research saved successfully."}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+                    {/* Loading State */}
+                    {papersLoading && (
+                        <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 text-center">
+                            <p className="text-sm text-gray-600">
+                                Loading research papers...
+                            </p>
+                        </div>
+                    )}
 
-                        {/* Academic papers */}
-                        {submittedTopic && (
-                            <section className="mb-10">
-                                <div className="mb-5">
-                                    <h2 className="text-2xl font-semibold text-black">
-                                        Academic Papers
+                    {/* Papers Section */}
+                    {!papersLoading && submittedTopic && (
+                        <section className="mt-8">
+                            <div className="mb-5 flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-900">
+                                        Research Papers
                                     </h2>
 
-                                    <p className="mt-1 text-sm text-gray-600">
-                                        {papers.length} papers found for
-                                        this research.
+                                    <p className="mt-1 text-sm text-gray-500">
+                                        {papersFound} papers found
                                     </p>
                                 </div>
+                            </div>
 
-                                {isSubmitting ? (
-                                    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
-                                        <p className="text-sm text-gray-600">
-                                            Finding academic papers...
-                                        </p>
-                                    </div>
-                                ) : papers.length === 0 ? (
-                                    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
-                                        <p className="text-sm text-gray-600">
-                                            No academic papers found yet.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-5">
-                                        {papers.map((paper) => (
-                                            <article
-                                                key={paper.id}
-                                                className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
-                                            >
-                                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                                                    {paper.publicationYear && (
-                                                        <span>
-                                                            {
-                                                                paper.publicationYear
-                                                            }
-                                                        </span>
-                                                    )}
+                            {papers.length === 0 ? (
+                                <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+                                    <p className="text-sm text-gray-600">
+                                        No research papers found for this topic.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-5">
+                                    {papers.map((paper) => (
+                                        <article
+                                            key={paper.id}
+                                            className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+                                        >
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="min-w-0">
+                                                    <h3 className="text-base font-semibold text-gray-900">
+                                                        {paper.title}
+                                                    </h3>
 
-                                                    {paper.journal && (
-                                                        <span>
-                                                            •{" "}
-                                                            {
-                                                                paper.journal
-                                                            }
-                                                        </span>
-                                                    )}
-
-                                                    <span>
-                                                        •{" "}
-                                                        {
-                                                            paper.citationCount
-                                                        }{" "}
-                                                        citations
-                                                    </span>
-
-                                                    {paper.isOpenAccess && (
-                                                        <span className="rounded-full bg-green-100 px-2 py-1 text-green-700">
-                                                            Open Access
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                <h3 className="mt-3 text-lg font-semibold leading-7 text-black">
-                                                    {paper.title}
-                                                </h3>
-
-                                                {paper.abstract && (
-                                                    <p className="mt-3 line-clamp-4 text-sm leading-6 text-gray-600">
-                                                        {
-                                                            paper.abstract
-                                                        }
-                                                    </p>
-                                                )}
-
-                                                {paper.authors.length >
-                                                    0 && (
-                                                    <p className="mt-3 text-sm text-gray-500">
-                                                        <span className="font-medium text-gray-700">
-                                                            Authors:
-                                                        </span>{" "}
-                                                        {paper.authors.join(
-                                                            ", "
+                                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                                                        {paper.publicationYear && (
+                                                            <span>
+                                                                Published:{" "}
+                                                                {
+                                                                    paper.publicationYear
+                                                                }
+                                                            </span>
                                                         )}
-                                                    </p>
+
+                                                        <span>
+                                                            Citations:{" "}
+                                                            {
+                                                                paper.citationCount
+                                                            }
+                                                        </span>
+
+                                                        {paper.journal && (
+                                                            <span>
+                                                                {
+                                                                    paper.journal
+                                                                }
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {paper.isOpenAccess && (
+                                                    <span className="shrink-0 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                                                        Open Access
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {paper.authors.length > 0 && (
+                                                <p className="mt-4 text-sm text-gray-600">
+                                                    <span className="font-medium">
+                                                        Authors:
+                                                    </span>{" "}
+                                                    {paper.authors.join(
+                                                        ", "
+                                                    )}
+                                                </p>
+                                            )}
+
+                                            {paper.abstract && (
+                                                <p className="mt-4 line-clamp-4 text-sm leading-6 text-gray-700">
+                                                    {paper.abstract}
+                                                </p>
+                                            )}
+
+                                            <div className="mt-5 flex flex-wrap items-center gap-3">
+                                                {paper.sourceUrl && (
+                                                    <a
+                                                        href={paper.sourceUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+                                                    >
+                                                        View Paper
+                                                    </a>
                                                 )}
 
-                                                <div className="mt-4 flex flex-wrap gap-3">
-                                                    {paper.sourceUrl && (
-                                                        <a
-                                                            href={
-                                                                paper.sourceUrl
-                                                            }
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="rounded-lg bg-black px-4 py-2 text-sm text-white transition hover:bg-gray-800"
-                                                        >
-                                                            View Paper
-                                                        </a>
-                                                    )}
-
-                                                    {paper.doi && (
-                                                        <a
-                                                            href={
-                                                                paper.doi.startsWith(
-                                                                    "http"
-                                                                )
-                                                                    ? paper.doi
-                                                                    : `https://doi.org/${paper.doi}`
-                                                            }
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-black transition hover:bg-gray-100"
-                                                        >
-                                                            View DOI
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            </article>
-                                        ))}
-                                    </div>
-                                )}
-                            </section>
-                        )}
-
-                        {/* Research input */}
-                        <ResearchInput
-                            researchTopic={researchTopic}
-                            onResearchTopicChange={setResearchTopic}
-                            onSubmit={handleSubmit}
-                        />
-
-                        {/* Suggestions */}
-                        {!submittedTopic && (
-                            <ResearchSuggestions
-                                onSelect={setResearchTopic}
-                            />
-                        )}
-                    </div>
+                                                {paper.doi && (
+                                                    <a
+                                                        href={
+                                                            paper.doi.startsWith(
+                                                                "http"
+                                                            )
+                                                                ? paper.doi
+                                                                : `https://doi.org/${paper.doi}`
+                                                        }
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                                                    >
+                                                        View DOI
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </article>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+                    )}
                 </div>
-            </section>
-        </main>
+            </main>
+        </div>
     );
 }
