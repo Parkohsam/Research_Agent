@@ -11,6 +11,10 @@ const {
     normalizeAcademicPaper,
 } = require("../services/academicSearchService");
 
+const {
+    validateResearchTopic,
+} = require("../services/topicValidationService");
+
 const resolvers = {
     User: {
         id: (user) => user._id.toString(),
@@ -19,7 +23,8 @@ const resolvers = {
     Research: {
         id: (research) => research._id.toString(),
 
-        userId: (research) => research.userId.toString(),
+        userId: (research) =>
+            research.userId.toString(),
 
         papers: async (research) => {
             return Paper.find({
@@ -112,8 +117,11 @@ const resolvers = {
 
             const title = args.title.trim();
 
-            if (!title) {
-                throw new Error("Research title is required");
+            const validation =
+                validateResearchTopic(title);
+
+            if (!validation.valid) {
+                throw new Error(validation.message);
             }
 
             return Research.create({
@@ -123,7 +131,11 @@ const resolvers = {
             });
         },
 
-        searchResearchPapers: async (_, args, context) => {
+        searchResearchPapers: async (
+            _,
+            args,
+            context
+        ) => {
             if (!context.user) {
                 throw new Error("Unauthorized");
             }
@@ -173,8 +185,10 @@ const resolvers = {
                 await research.save();
 
                 return {
-                    researchId: research._id.toString(),
-                    totalFound: normalizedPapers.length,
+                    researchId:
+                        research._id.toString(),
+                    totalFound:
+                        normalizedPapers.length,
                 };
             } catch (error) {
                 research.status = "failed";
@@ -189,6 +203,33 @@ const resolvers = {
                     "Unable to search and save academic papers."
                 );
             }
+        },
+
+        deleteResearch: async (_, args, context) => {
+            if (!context.user) {
+                throw new Error("Unauthorized");
+            }
+
+            const research = await Research.findOne({
+                _id: args.researchId,
+                userId: context.user._id,
+            });
+
+            if (!research) {
+                throw new Error("Research not found");
+            }
+
+            // Delete all papers belonging to this research
+            await Paper.deleteMany({
+                researchId: research._id,
+            });
+
+            // Delete the research itself
+            await Research.deleteOne({
+                _id: research._id,
+            });
+
+            return true;
         },
     },
 };

@@ -72,6 +72,10 @@ const typeDefs = `
         searchResearchPapers(
             researchId: ID!
         ): ResearchSearchResult!
+
+        deleteResearch(
+            researchId: ID!
+        ): Boolean!
     }
 `;
 
