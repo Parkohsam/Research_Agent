@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { loginUser } from "@/lib/graphql";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -10,8 +11,11 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
-    function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+    async function handleLogin(
+        event: React.FormEvent<HTMLFormElement>
+    ) {
         event.preventDefault();
 
         setError("");
@@ -21,9 +25,49 @@ export default function LoginPage() {
             return;
         }
 
-        // Temporary frontend login.
-        // Real authentication will be connected to the backend later.
-        router.push("/dashboard");
+        try {
+            setLoading(true);
+
+            const result = await loginUser(
+                email.trim(),
+                password
+            );
+
+            const { token, user } = result.login;
+
+            localStorage.setItem("token", token);
+            localStorage.setItem("user", JSON.stringify(user));
+
+            router.push("/dashboard");
+        } catch (error) {
+            console.error("Login error:", error);
+
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : String(error);
+
+            // Display a friendly message for invalid credentials
+            if (
+                errorMessage
+                    .toLowerCase()
+                    .includes("invalid email or password")
+            ) {
+                setError("Invalid email or password.");
+            } else if (
+                errorMessage
+                    .toLowerCase()
+                    .includes("unexpected error")
+            ) {
+                setError("Invalid email or password.");
+            } else {
+                setError(
+                    "Unable to log in. Please check your connection and try again."
+                );
+            }
+        } finally {
+            setLoading(false);
+        }
     }
 
     return (
@@ -32,7 +76,10 @@ export default function LoginPage() {
 
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <Link href="/" className="text-3xl font-bold text-black">
+                    <Link
+                        href="/"
+                        className="text-3xl font-bold text-black"
+                    >
                         Research<span className="text-blue-600">AI</span>
                     </Link>
 
@@ -51,8 +98,10 @@ export default function LoginPage() {
                         Enter your details to access your research workspace.
                     </p>
 
-                    <form onSubmit={handleLogin} className="mt-8 space-y-5">
-
+                    <form
+                        onSubmit={handleLogin}
+                        className="mt-8 space-y-5"
+                    >
                         {/* Email */}
                         <div>
                             <label
@@ -66,7 +115,9 @@ export default function LoginPage() {
                                 id="email"
                                 type="email"
                                 value={email}
-                                onChange={(event) => setEmail(event.target.value)}
+                                onChange={(event) =>
+                                    setEmail(event.target.value)
+                                }
                                 placeholder="Enter your email"
                                 className="w-full px-4 py-3 text-black placeholder:text-gray-500 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             />
@@ -85,7 +136,9 @@ export default function LoginPage() {
                                 id="password"
                                 type="password"
                                 value={password}
-                                onChange={(event) => setPassword(event.target.value)}
+                                onChange={(event) =>
+                                    setPassword(event.target.value)
+                                }
                                 placeholder="Enter your password"
                                 className="w-full px-4 py-3 text-black placeholder:text-gray-500 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             />
@@ -101,15 +154,16 @@ export default function LoginPage() {
                         {/* Login Button */}
                         <button
                             type="submit"
-                            className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition"
+                            disabled={loading}
+                            className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            Log in
+                            {loading ? "Logging in..." : "Log in"}
                         </button>
                     </form>
 
                     {/* Signup */}
                     <p className="mt-6 text-center text-sm text-gray-600">
-                        Dont have an account?{" "}
+                        Don&apos;t have an account?{" "}
                         <Link
                             href="/signup"
                             className="font-medium text-indigo-600 hover:text-indigo-700"
@@ -123,7 +177,7 @@ export default function LoginPage() {
                 <div className="text-center mt-6">
                     <Link
                         href="/"
-                        className="text-bold text-gray-500 hover:text-gray-800"
+                        className="font-bold text-gray-500 hover:text-gray-800"
                     >
                         Back to home
                     </Link>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signupUser } from "@/lib/graphql";
 
 export default function SignupPage() {
     const router = useRouter();
@@ -12,8 +13,11 @@ export default function SignupPage() {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
-    function handleSignup(event: React.FormEvent<HTMLFormElement>) {
+    async function handleSignup(
+        event: React.FormEvent<HTMLFormElement>
+    ) {
         event.preventDefault();
 
         setError("");
@@ -38,9 +42,32 @@ export default function SignupPage() {
             return;
         }
 
-        // Temporary frontend signup.
-        // Real account creation will be connected to MongoDB later.
-        router.push("/dashboard");
+        try {
+            setLoading(true);
+
+            const result = await signupUser(
+                name,
+                email,
+                password
+            );
+
+            const { token, user } = result.signup;
+
+            // Store the authentication token and user information
+            localStorage.setItem("token", token);
+            localStorage.setItem("user", JSON.stringify(user));
+
+            // Redirect to the dashboard after successful signup
+            router.push("/dashboard");
+        } catch (error) {
+            if (error instanceof Error) {
+                setError(error.message);
+            } else {
+                setError("Something went wrong. Please try again.");
+            }
+        } finally {
+            setLoading(false);
+        }
     }
 
     return (
@@ -49,7 +76,10 @@ export default function SignupPage() {
 
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <Link href="/" className="text-3xl font-bold text-black">
+                    <Link
+                        href="/"
+                        className="text-3xl font-bold text-black"
+                    >
                         Research<span className="text-blue-600">AI</span>
                     </Link>
 
@@ -68,7 +98,10 @@ export default function SignupPage() {
                         Start discovering and evaluating academic literature with AI.
                     </p>
 
-                    <form onSubmit={handleSignup} className="mt-8 space-y-5">
+                    <form
+                        onSubmit={handleSignup}
+                        className="mt-8 space-y-5"
+                    >
 
                         {/* Full Name */}
                         <div>
@@ -83,7 +116,9 @@ export default function SignupPage() {
                                 id="name"
                                 type="text"
                                 value={name}
-                                onChange={(event) => setName(event.target.value)}
+                                onChange={(event) =>
+                                    setName(event.target.value)
+                                }
                                 placeholder="Your full name"
                                 className="w-full px-4 py-3 text-black placeholder:text-gray-500 border border-black-500 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             />
@@ -102,7 +137,9 @@ export default function SignupPage() {
                                 id="email"
                                 type="email"
                                 value={email}
-                                onChange={(event) => setEmail(event.target.value)}
+                                onChange={(event) =>
+                                    setEmail(event.target.value)
+                                }
                                 placeholder="Enter your email"
                                 className="w-full px-4 py-3 text-black placeholder:text-gray-500 border border-black-500 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             />
@@ -121,7 +158,9 @@ export default function SignupPage() {
                                 id="password"
                                 type="password"
                                 value={password}
-                                onChange={(event) => setPassword(event.target.value)}
+                                onChange={(event) =>
+                                    setPassword(event.target.value)
+                                }
                                 placeholder="Create a password"
                                 className="w-full px-4 py-3 text-black placeholder:text-gray-500 border border-black-500 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             />
@@ -158,9 +197,12 @@ export default function SignupPage() {
                         {/* Button */}
                         <button
                             type="submit"
-                            className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition"
+                            disabled={loading}
+                            className="w-full py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            Create account
+                            {loading
+                                ? "Creating account..."
+                                : "Create account"}
                         </button>
                     </form>
 
