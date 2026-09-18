@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Menu } from "lucide-react";
 
 import Sidebar from "../components/dashboard/Sidebar";
 import ResearchInput from "../components/dashboard/ResearchInput";
@@ -22,15 +23,21 @@ import {
 export default function DashboardPage() {
     const router = useRouter();
 
+    /* ========================================= */
+    /* State                                     */
+    /* ========================================= */
+
     const [researchList, setResearchList] =
         useState<Research[]>([]);
 
     const [currentResearch, setCurrentResearch] =
         useState<Research | null>(null);
 
-    const [papers, setPapers] = useState<Paper[]>([]);
+    const [papers, setPapers] =
+        useState<Paper[]>([]);
 
-    const [topic, setTopic] = useState("");
+    const [topic, setTopic] =
+        useState("");
 
     const [submittedTopic, setSubmittedTopic] =
         useState("");
@@ -56,9 +63,14 @@ export default function DashboardPage() {
     const [aiError, setAiError] =
         useState("");
 
-    /* ---------------------------------- */
-    /* Load User and Research History     */
-    /* ---------------------------------- */
+    /* Mobile Sidebar */
+
+    const [mobileSidebarOpen, setMobileSidebarOpen] =
+        useState(false);
+
+    /* ========================================= */
+    /* Load Dashboard                            */
+    /* ========================================= */
 
     useEffect(() => {
         const loadDashboard = async () => {
@@ -90,7 +102,10 @@ export default function DashboardPage() {
                     error
                 );
 
-                localStorage.removeItem("token");
+                localStorage.removeItem(
+                    "token"
+                );
+
                 router.push("/login");
             }
         };
@@ -98,9 +113,9 @@ export default function DashboardPage() {
         loadDashboard();
     }, [router]);
 
-    /* ---------------------------------- */
-    /* New Research                       */
-    /* ---------------------------------- */
+    /* ========================================= */
+    /* New Research                              */
+    /* ========================================= */
 
     const handleNewResearch = () => {
         setCurrentResearch(null);
@@ -113,9 +128,9 @@ export default function DashboardPage() {
         setAnalyzingPaperId(null);
     };
 
-    /* ---------------------------------- */
-    /* Select Existing Research           */
-    /* ---------------------------------- */
+    /* ========================================= */
+    /* Select Existing Research                  */
+    /* ========================================= */
 
     const handleSelectResearch = async (
         research: Research
@@ -165,9 +180,9 @@ export default function DashboardPage() {
         }
     };
 
-    /* ---------------------------------- */
-    /* Submit New Research                */
-    /* ---------------------------------- */
+    /* ========================================= */
+    /* Submit New Research                       */
+    /* ========================================= */
 
     const handleSubmit = async () => {
         const trimmedTopic =
@@ -177,6 +192,7 @@ export default function DashboardPage() {
             setTopicError(
                 "Please enter an academic research topic."
             );
+
             return;
         }
 
@@ -208,6 +224,7 @@ export default function DashboardPage() {
             setTopicError(
                 "Please enter an academic research topic, not a greeting or ordinary message."
             );
+
             return;
         }
 
@@ -215,6 +232,7 @@ export default function DashboardPage() {
             setTopicError(
                 "Please enter a more descriptive research topic."
             );
+
             return;
         }
 
@@ -292,9 +310,9 @@ export default function DashboardPage() {
         }
     };
 
-    /* ---------------------------------- */
-    /* Analyze Paper With AI              */
-    /* ---------------------------------- */
+    /* ========================================= */
+    /* Analyze Paper With AI                     */
+    /* ========================================= */
 
     const handleAnalyzePaper = async (
         paper: Paper
@@ -311,6 +329,7 @@ export default function DashboardPage() {
             setAiError(
                 "This paper does not have an abstract available for AI analysis."
             );
+
             return;
         }
 
@@ -330,43 +349,44 @@ export default function DashboardPage() {
             const analysis =
                 response.analyzePaper;
 
-            setPapers((previousPapers) =>
-                previousPapers.map(
-                    (currentPaper) =>
-                        currentPaper.id ===
-                        paper.id
-                            ? {
-                                  ...currentPaper,
+            setPapers(
+                (previousPapers) =>
+                    previousPapers.map(
+                        (currentPaper) =>
+                            currentPaper.id ===
+                            paper.id
+                                ? {
+                                      ...currentPaper,
 
-                                  aiScore:
-                                      analysis.score,
+                                      aiScore:
+                                          analysis.score,
 
-                                  aiSummary:
-                                      analysis.summary,
+                                      aiSummary:
+                                          analysis.summary,
 
-                                  aiRelevance:
-                                      analysis.relevance,
+                                      aiRelevance:
+                                          analysis.relevance,
 
-                                  aiKeyFindings:
-                                      analysis.keyFindings,
+                                      aiKeyFindings:
+                                          analysis.keyFindings,
 
-                                  aiMethodology:
-                                      analysis.methodology,
+                                      aiMethodology:
+                                          analysis.methodology,
 
-                                  aiAnalyzedAt:
-                                      new Date().toISOString(),
+                                      aiAnalyzedAt:
+                                          new Date().toISOString(),
 
-                                  evaluationStatus:
-                                      analysis.score >=
-                                      80
-                                          ? "recommended"
-                                          : analysis.score >=
-                                            60
-                                          ? "candidate"
-                                          : "rejected",
-                              }
-                            : currentPaper
-                )
+                                      evaluationStatus:
+                                          analysis.score >=
+                                          80
+                                              ? "recommended"
+                                              : analysis.score >=
+                                                60
+                                              ? "candidate"
+                                              : "rejected",
+                                  }
+                                : currentPaper
+                    )
             );
         } catch (error) {
             console.error(
@@ -384,9 +404,9 @@ export default function DashboardPage() {
         }
     };
 
-    /* ---------------------------------- */
-    /* Delete Research                    */
-    /* ---------------------------------- */
+    /* ========================================= */
+    /* Delete Research                           */
+    /* ========================================= */
 
     const handleDeleteResearch = async (
         research: Research
@@ -442,8 +462,16 @@ export default function DashboardPage() {
         }
     };
 
+    /* ========================================= */
+    /* Render                                    */
+    /* ========================================= */
+
     return (
-        <div className="flex min-h-screen bg-gray-50">
+        <div className="min-h-screen overflow-x-hidden bg-gray-50 md:flex">
+            {/* ================================= */}
+            {/* Sidebar                            */}
+            {/* ================================= */}
+
             <Sidebar
                 researchList={researchList}
                 onNewResearch={
@@ -456,55 +484,133 @@ export default function DashboardPage() {
                     handleDeleteResearch
                 }
                 userName={userName}
+                mobileOpen={
+                    mobileSidebarOpen
+                }
+                onCloseMobile={() =>
+                    setMobileSidebarOpen(
+                        false
+                    )
+                }
             />
 
-            <main className="flex-1">
-                {/* Header */}
-                <header className="border-b border-gray-200 bg-white px-8 py-5">
-                    <h1 className="text-xl font-semibold text-gray-900">
-                        {currentResearch
-                            ? currentResearch.title
-                            : "New Research"}
-                    </h1>
+            {/* ================================= */}
+            {/* Main Content                       */}
+            {/* ================================= */}
 
-                    <p className="mt-1 text-sm text-gray-500">
-                        Discover and explore
-                        academic research papers
-                        with AI-powered analysis.
-                    </p>
+            <main className="min-w-0 flex-1">
+                {/* ================================= */}
+                {/* Header                            */}
+                {/* ================================= */}
+
+                <header className="border-b border-gray-200 bg-white">
+                    <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+                        {/* Mobile Menu Button */}
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setMobileSidebarOpen(
+                                    true
+                                )
+                            }
+                            aria-label="Open navigation"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-700 transition hover:bg-gray-50 md:hidden"
+                        >
+                            <Menu
+                                size={20}
+                            />
+                        </button>
+
+                        {/* Header Text */}
+
+                        <div className="min-w-0 flex-1">
+                            <h1 className="truncate text-lg font-semibold text-gray-900 sm:text-xl">
+                                {currentResearch
+                                    ? currentResearch.title
+                                    : "New Research"}
+                            </h1>
+
+                            <p className="mt-1 hidden text-sm text-gray-500 sm:block">
+                                Discover and explore
+                                academic research papers
+                                with AI-powered analysis.
+                            </p>
+                        </div>
+
+                        {/* Mobile User Avatar */}
+
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-xs font-semibold text-white md:hidden">
+                            {userName
+                                ? userName
+                                      .charAt(
+                                          0
+                                      )
+                                      .toUpperCase()
+                                : "U"}
+                        </div>
+                    </div>
                 </header>
 
-                <div className="mx-auto max-w-5xl px-8 py-8">
-                    {/* Submitted Topic */}
+                {/* ================================= */}
+                {/* Page Content                       */}
+                {/* ================================= */}
+
+                <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+                    {/* ================================= */}
+                    {/* Submitted Topic                   */}
+                    {/* ================================= */}
+
                     {submittedTopic && (
                         <div className="mb-6">
                             <p className="mb-2 text-sm font-medium text-gray-700">
                                 Research topic
                             </p>
 
-                            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800">
-                                {submittedTopic}
+                            <div className="break-words rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm leading-6 text-gray-800 shadow-sm">
+                                {
+                                    submittedTopic
+                                }
                             </div>
                         </div>
                     )}
 
-                    {/* Research Error */}
+                    {/* ================================= */}
+                    {/* Research Error                    */}
+                    {/* ================================= */}
+
                     {topicError && (
-                        <div className="mb-5 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                            <span>⚠️</span>
-                            <p>{topicError}</p>
+                        <div className="mb-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+                            <span className="shrink-0">
+                                ⚠️
+                            </span>
+
+                            <p className="min-w-0 break-words">
+                                {topicError}
+                            </p>
                         </div>
                     )}
 
-                    {/* AI Error */}
+                    {/* ================================= */}
+                    {/* AI Error                          */}
+                    {/* ================================= */}
+
                     {aiError && (
-                        <div className="mb-5 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
-                            <span>⚠️</span>
-                            <p>{aiError}</p>
+                        <div className="mb-5 flex items-start gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm leading-6 text-orange-700">
+                            <span className="shrink-0">
+                                ⚠️
+                            </span>
+
+                            <p className="min-w-0 break-words">
+                                {aiError}
+                            </p>
                         </div>
                     )}
 
-                    {/* Research Input */}
+                    {/* ================================= */}
+                    {/* Research Input                    */}
+                    {/* ================================= */}
+
                     <ResearchInput
                         topic={topic}
                         setTopic={(
@@ -520,7 +626,10 @@ export default function DashboardPage() {
                         loading={loading}
                     />
 
-                    {/* Suggestions */}
+                    {/* ================================= */}
+                    {/* Suggestions                        */}
+                    {/* ================================= */}
+
                     {!submittedTopic && (
                         <ResearchSuggestions
                             onSelectSuggestion={(
@@ -529,14 +638,18 @@ export default function DashboardPage() {
                                 setTopic(
                                     suggestion
                                 );
+
                                 setTopicError("");
                             }}
                         />
                     )}
 
-                    {/* Loading State */}
+                    {/* ================================= */}
+                    {/* Loading State                     */}
+                    {/* ================================= */}
+
                     {papersLoading && (
-                        <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 text-center">
+                        <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
                             <p className="text-sm text-gray-600">
                                 Loading research
                                 papers...
@@ -544,14 +657,20 @@ export default function DashboardPage() {
                         </div>
                     )}
 
-                    {/* Papers Section */}
+                    {/* ================================= */}
+                    {/* Research Papers                   */}
+                    {/* ================================= */}
+
                     {!papersLoading &&
                         submittedTopic && (
                             <section className="mt-8">
-                                <div className="mb-5 flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-gray-900">
-                                            Research Papers
+                                {/* Papers Heading */}
+
+                                <div className="mb-5 flex items-end justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <h2 className="text-xl font-semibold tracking-tight text-gray-900">
+                                            Research
+                                            Papers
                                         </h2>
 
                                         <p className="mt-1 text-sm text-gray-500">
@@ -564,9 +683,13 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
 
+                                {/* ================================= */}
+                                {/* No Papers                         */}
+                                {/* ================================= */}
+
                                 {papers.length ===
                                 0 ? (
-                                    <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+                                    <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
                                         <p className="text-sm text-gray-600">
                                             No research
                                             papers
@@ -575,6 +698,10 @@ export default function DashboardPage() {
                                         </p>
                                     </div>
                                 ) : (
+                                    /* ================================= */
+                                    /* Paper List                        */
+                                    /* ================================= */
+
                                     <div className="space-y-5">
                                         {papers.map(
                                             (
@@ -584,18 +711,23 @@ export default function DashboardPage() {
                                                     key={
                                                         paper.id
                                                     }
-                                                    className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+                                                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
                                                 >
-                                                    {/* Paper Header */}
-                                                    <div className="flex items-start justify-between gap-4">
-                                                        <div className="min-w-0">
-                                                            <h3 className="text-base font-semibold text-gray-900">
+                                                    {/* ================================= */}
+                                                    {/* Paper Header                      */}
+                                                    {/* ================================= */}
+
+                                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                                        {/* Paper Information */}
+
+                                                        <div className="min-w-0 flex-1">
+                                                            <h3 className="break-words text-base font-semibold leading-6 text-gray-900 sm:text-lg">
                                                                 {
                                                                     paper.title
                                                                 }
                                                             </h3>
 
-                                                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                                                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-gray-500">
                                                                 {paper.publicationYear && (
                                                                     <span>
                                                                         Published:{" "}
@@ -613,7 +745,7 @@ export default function DashboardPage() {
                                                                 </span>
 
                                                                 {paper.journal && (
-                                                                    <span>
+                                                                    <span className="break-words">
                                                                         {
                                                                             paper.journal
                                                                         }
@@ -622,7 +754,9 @@ export default function DashboardPage() {
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex shrink-0 flex-col items-end gap-2">
+                                                        {/* Badges */}
+
+                                                        <div className="flex shrink-0 flex-wrap items-start gap-2 sm:flex-col sm:items-end">
                                                             {paper.isOpenAccess && (
                                                                 <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
                                                                     Open
@@ -646,12 +780,15 @@ export default function DashboardPage() {
                                                         </div>
                                                     </div>
 
-                                                    {/* Authors */}
+                                                    {/* ================================= */}
+                                                    {/* Authors                          */}
+                                                    {/* ================================= */}
+
                                                     {paper.authors
                                                         .length >
                                                         0 && (
-                                                        <p className="mt-4 text-sm text-gray-600">
-                                                            <span className="font-medium">
+                                                        <p className="mt-4 break-words text-sm leading-6 text-gray-600">
+                                                            <span className="font-medium text-gray-800">
                                                                 Authors:
                                                             </span>{" "}
                                                             {paper.authors.join(
@@ -660,14 +797,17 @@ export default function DashboardPage() {
                                                         </p>
                                                     )}
 
-                                                    {/* Abstract */}
+                                                    {/* ================================= */}
+                                                    {/* Abstract                         */}
+                                                    {/* ================================= */}
+
                                                     {paper.abstract && (
                                                         <div className="mt-4">
                                                             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
                                                                 Abstract
                                                             </p>
 
-                                                            <p className="line-clamp-4 text-sm leading-6 text-gray-700">
+                                                            <p className="line-clamp-4 break-words text-sm leading-6 text-gray-700">
                                                                 {
                                                                     paper.abstract
                                                                 }
@@ -675,8 +815,13 @@ export default function DashboardPage() {
                                                         </div>
                                                     )}
 
-                                                    {/* Actions */}
-                                                    <div className="mt-5 flex flex-wrap items-center gap-3">
+                                                    {/* ================================= */}
+                                                    {/* Actions                          */}
+                                                    {/* ================================= */}
+
+                                                    <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+                                                        {/* View Paper */}
+
                                                         {paper.sourceUrl && (
                                                             <a
                                                                 href={
@@ -684,12 +829,14 @@ export default function DashboardPage() {
                                                                 }
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+                                                                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 sm:w-auto"
                                                             >
                                                                 View
                                                                 Paper
                                                             </a>
                                                         )}
+
+                                                        {/* View DOI */}
 
                                                         {paper.doi && (
                                                             <a
@@ -702,12 +849,14 @@ export default function DashboardPage() {
                                                                 }
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                                                                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 sm:w-auto"
                                                             >
                                                                 View
                                                                 DOI
                                                             </a>
                                                         )}
+
+                                                        {/* Analyze With AI */}
 
                                                         {paper.abstract && (
                                                             <button
@@ -721,13 +870,13 @@ export default function DashboardPage() {
                                                                     analyzingPaperId ===
                                                                     paper.id
                                                                 }
-                                                                className="rounded-lg border border-indigo-600 px-4 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-indigo-600 px-4 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                                                             >
                                                                 {analyzingPaperId ===
                                                                 paper.id
                                                                     ? "Analyzing..."
                                                                     : paper.aiScore !==
-                                                                        null &&
+                                                                          null &&
                                                                       paper.aiScore !==
                                                                           undefined
                                                                     ? "Analyze Again"
@@ -736,10 +885,15 @@ export default function DashboardPage() {
                                                         )}
                                                     </div>
 
-                                                    {/* AI Analysis */}
+                                                    {/* ================================= */}
+                                                    {/* AI Analysis                      */}
+                                                    {/* ================================= */}
+
                                                     {paper.aiSummary && (
-                                                        <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/50 p-5">
-                                                            <div className="mb-4 flex items-center justify-between gap-3">
+                                                        <div className="mt-6 overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 sm:p-5">
+                                                            {/* AI Header */}
+
+                                                            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                                                 <h4 className="text-base font-semibold text-gray-900">
                                                                     AI
                                                                     Analysis
@@ -759,12 +913,13 @@ export default function DashboardPage() {
                                                             </div>
 
                                                             {/* Summary */}
+
                                                             <div className="mb-4">
                                                                 <h5 className="mb-1 text-sm font-semibold text-gray-800">
                                                                     Summary
                                                                 </h5>
 
-                                                                <p className="text-sm leading-6 text-gray-700">
+                                                                <p className="break-words text-sm leading-6 text-gray-700">
                                                                     {
                                                                         paper.aiSummary
                                                                     }
@@ -772,6 +927,7 @@ export default function DashboardPage() {
                                                             </div>
 
                                                             {/* Relevance */}
+
                                                             {paper.aiRelevance && (
                                                                 <div className="mb-4">
                                                                     <h5 className="mb-1 text-sm font-semibold text-gray-800">
@@ -782,7 +938,7 @@ export default function DashboardPage() {
                                                                         relevant
                                                                     </h5>
 
-                                                                    <p className="text-sm leading-6 text-gray-700">
+                                                                    <p className="break-words text-sm leading-6 text-gray-700">
                                                                         {
                                                                             paper.aiRelevance
                                                                         }
@@ -791,6 +947,7 @@ export default function DashboardPage() {
                                                             )}
 
                                                             {/* Key Findings */}
+
                                                             {paper.aiKeyFindings &&
                                                                 paper
                                                                     .aiKeyFindings
@@ -810,6 +967,7 @@ export default function DashboardPage() {
                                                                                 ) => (
                                                                                     <li
                                                                                         key={`${paper.id}-finding-${index}`}
+                                                                                        className="break-words"
                                                                                     >
                                                                                         {
                                                                                             finding
@@ -822,13 +980,14 @@ export default function DashboardPage() {
                                                                 )}
 
                                                             {/* Methodology */}
+
                                                             {paper.aiMethodology && (
                                                                 <div>
                                                                     <h5 className="mb-1 text-sm font-semibold text-gray-800">
                                                                         Methodology
                                                                     </h5>
 
-                                                                    <p className="text-sm leading-6 text-gray-700">
+                                                                    <p className="break-words text-sm leading-6 text-gray-700">
                                                                         {
                                                                             paper.aiMethodology
                                                                         }
