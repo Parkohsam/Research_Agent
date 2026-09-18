@@ -22,9 +22,21 @@ const resolvers = require("./graphql/resolvers");
 
 const app = express();
 
-app.use(cors());
+/* CORS */
+app.use(
+    cors({
+        origin: true,
+        methods: ["GET", "POST", "OPTIONS"],
+        allowedHeaders: [
+            "Content-Type",
+            "Authorization",
+        ],
+    })
+);
+
 app.use(express.json());
 
+/* GraphQL */
 const yoga = createYoga({
     schema: createSchema({
         typeDefs,
@@ -49,27 +61,37 @@ const yoga = createYoga({
 
 app.use("/graphql", yoga);
 
+/* Health check */
 app.get("/", (req, res) => {
     res.send("ResearchAI backend is running!");
 });
 
+/* Start server */
 const startServer = async () => {
     try {
         await connectDB();
 
         const PORT = process.env.PORT || 5000;
 
-        app.listen(PORT, () => {
-            console.log(
-                `ResearchAI backend running on http://localhost:${PORT}`
-            );
+        app.listen(
+            PORT,
+            "0.0.0.0",
+            () => {
+                console.log(
+                    `ResearchAI backend running on port ${PORT}`
+                );
 
-            console.log(
-                `GraphQL endpoint: http://localhost:${PORT}/graphql`
-            );
-        });
+                console.log(
+                    `GraphQL endpoint available at /graphql`
+                );
+            }
+        );
     } catch (error) {
-        console.error("Server startup failed:", error.message);
+        console.error(
+            "Server startup failed:",
+            error.message
+        );
+
         process.exit(1);
     }
 };
