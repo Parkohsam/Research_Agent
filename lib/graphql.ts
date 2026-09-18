@@ -15,21 +15,27 @@ export async function graphqlRequest<T>(
     headers?: Record<string, string>
 ): Promise<T> {
     if (!GRAPHQL_URL) {
-        throw new Error("GraphQL URL is not configured");
+        throw new Error(
+            "GraphQL URL is not configured"
+        );
     }
 
     try {
-        const response = await fetch(GRAPHQL_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...headers,
-            },
-            body: JSON.stringify({
-                query,
-                variables,
-            }),
-        });
+        const response = await fetch(
+            GRAPHQL_URL,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                    ...headers,
+                },
+                body: JSON.stringify({
+                    query,
+                    variables,
+                }),
+            }
+        );
 
         const result: GraphQLResponse<T> =
             await response.json();
@@ -41,8 +47,13 @@ export async function graphqlRequest<T>(
             );
         }
 
-        if (result.errors && result.errors.length > 0) {
-            throw new Error(result.errors[0].message);
+        if (
+            result.errors &&
+            result.errors.length > 0
+        ) {
+            throw new Error(
+                result.errors[0].message
+            );
         }
 
         if (!result.data) {
@@ -197,17 +208,35 @@ export type Paper = {
     id: string;
     researchId: string;
     openAlexId: string;
+
     title: string;
     abstract: string | null;
+
     publicationYear: number | null;
     doi: string | null;
+
     authors: string[];
+
     journal: string | null;
     sourceUrl: string | null;
+
     citationCount: number;
     isOpenAccess: boolean;
+
     evaluationStatus: string;
+
     aiScore: number | null;
+
+    aiSummary: string | null;
+
+    aiRelevance: string | null;
+
+    aiKeyFindings: string[];
+
+    aiMethodology: string | null;
+
+    aiAnalyzedAt: string | null;
+
     createdAt: string;
     updatedAt: string;
 };
@@ -235,8 +264,12 @@ export async function createResearch(
     token: string
 ) {
     const mutation = `
-        mutation CreateResearch($title: String!) {
-            createResearch(title: $title) {
+        mutation CreateResearch(
+            $title: String!
+        ) {
+            createResearch(
+                title: $title
+            ) {
                 id
                 userId
                 title
@@ -354,17 +387,30 @@ export async function getResearchPapers(
                 id
                 researchId
                 openAlexId
+
                 title
                 abstract
+
                 publicationYear
                 doi
+
                 authors
+
                 journal
                 sourceUrl
+
                 citationCount
                 isOpenAccess
+
                 evaluationStatus
                 aiScore
+
+                aiSummary
+                aiRelevance
+                aiKeyFindings
+                aiMethodology
+                aiAnalyzedAt
+
                 createdAt
                 updatedAt
             }
@@ -375,6 +421,60 @@ export async function getResearchPapers(
         query,
         {
             researchId,
+        },
+        {
+            Authorization: `Bearer ${token}`,
+        }
+    );
+}
+
+/* ---------------------------------- */
+/* AI Paper Analysis                  */
+/* ---------------------------------- */
+
+export type PaperAIAnalysis = {
+    paperId: string;
+
+    score: number;
+
+    summary: string;
+
+    relevance: string;
+
+    keyFindings: string[];
+
+    methodology: string;
+};
+
+export type AnalyzePaperResponse = {
+    analyzePaper: PaperAIAnalysis;
+};
+
+export async function analyzePaper(
+    paperId: string,
+    token: string
+) {
+    const mutation = `
+        mutation AnalyzePaper(
+            $paperId: ID!
+        ) {
+            analyzePaper(
+                paperId: $paperId
+            ) {
+                paperId
+                score
+                summary
+                relevance
+                keyFindings
+                methodology
+            }
+        }
+    `;
+
+    return graphqlRequest<AnalyzePaperResponse>(
+        mutation,
+        {
+            paperId,
         },
         {
             Authorization: `Bearer ${token}`,
