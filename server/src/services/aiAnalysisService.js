@@ -1,6 +1,19 @@
-const OLLAMA_URL = "http://127.0.0.1:11434/api/generate";
+const LOCAL_OLLAMA_URL =
+    "http://127.0.0.1:11434/api/generate";
 
-const MODEL_NAME = "qwen2.5:3b";
+const CLOUD_OLLAMA_URL =
+    "https://ollama.com/api/generate";
+
+const LOCAL_MODEL =
+    process.env.OLLAMA_LOCAL_MODEL ||
+    "qwen2.5:3b";
+
+const CLOUD_MODEL =
+    process.env.OLLAMA_MODEL ||
+    "gpt-oss:20b-cloud";
+
+const isProduction =
+    process.env.NODE_ENV === "production";
 
 const analyzePaperWithAI = async ({
     researchTopic,
@@ -54,27 +67,59 @@ Rules:
 - Return JSON only.
 `;
 
-    const response = await fetch(OLLAMA_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            model: MODEL_NAME,
-            prompt,
-            stream: false,
-            format: "json",
-            options: {
-                temperature: 0.2,
-            },
-        }),
-    });
+    const ollamaUrl = isProduction
+        ? CLOUD_OLLAMA_URL
+        : LOCAL_OLLAMA_URL;
+
+    const model = isProduction
+        ? CLOUD_MODEL
+        : LOCAL_MODEL;
+
+    const headers = {
+        "Content-Type": "application/json",
+    };
+
+    if (isProduction) {
+        const apiKey =
+            process.env.OLLAMA_API_KEY;
+
+        if (!apiKey) {
+            throw new Error(
+                "OLLAMA_API_KEY is not configured."
+            );
+        }
+
+        headers.Authorization =
+            `Bearer ${apiKey}`;
+    }
+
+    console.log(
+        `AI analysis using ${isProduction ? "Ollama Cloud" : "local Ollama"}`
+    );
+
+    const response = await fetch(
+        ollamaUrl,
+        {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                model,
+                prompt,
+                stream: false,
+                format: "json",
+                options: {
+                    temperature: 0.2,
+                },
+            }),
+        }
+    );
 
     if (!response.ok) {
-        const errorText = await response.text();
+        const errorText =
+            await response.text();
 
         console.error(
-            "Ollama error:",
+            "Ollama API error:",
             errorText
         );
 
@@ -83,7 +128,8 @@ Rules:
         );
     }
 
-    const result = await response.json();
+    const result =
+        await response.json();
 
     if (!result.response) {
         throw new Error(
@@ -94,7 +140,9 @@ Rules:
     let analysis;
 
     try {
-        analysis = JSON.parse(result.response);
+        analysis = JSON.parse(
+            result.response
+        );
     } catch (error) {
         console.error(
             "Failed to parse AI response:",
@@ -106,7 +154,8 @@ Rules:
         );
     }
 
-    const score = Number(analysis.score);
+    const score =
+        Number(analysis.score);
 
     if (
         Number.isNaN(score) ||
@@ -120,29 +169,35 @@ Rules:
 
     return {
         score,
+
         summary:
-            typeof analysis.summary === "string"
+            typeof analysis.summary ===
+            "string"
                 ? analysis.summary
                 : "",
 
         relevance:
-            typeof analysis.relevance === "string"
+            typeof analysis.relevance ===
+            "string"
                 ? analysis.relevance
                 : "",
 
-        keyFindings: Array.isArray(
-            analysis.keyFindings
-        )
-            ? analysis.keyFindings
-                  .filter(
-                      (finding) =>
-                          typeof finding === "string"
-                  )
-                  .slice(0, 5)
-            : [],
+        keyFindings:
+            Array.isArray(
+                analysis.keyFindings
+            )
+                ? analysis.keyFindings
+                      .filter(
+                          (finding) =>
+                              typeof finding ===
+                              "string"
+                      )
+                      .slice(0, 5)
+                : [],
 
         methodology:
-            typeof analysis.methodology === "string"
+            typeof analysis.methodology ===
+            "string"
                 ? analysis.methodology
                 : "",
     };
