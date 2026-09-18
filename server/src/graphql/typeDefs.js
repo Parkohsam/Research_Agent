@@ -32,6 +32,13 @@ const typeDefs = `
         isOpenAccess: Boolean!
         evaluationStatus: String!
         aiScore: Float
+
+        aiSummary: String
+        aiRelevance: String
+        aiKeyFindings: [String!]!
+        aiMethodology: String
+        aiAnalyzedAt: String
+
         createdAt: String!
         updatedAt: String!
     }
@@ -44,6 +51,15 @@ const typeDefs = `
     type AuthPayload {
         token: String!
         user: User!
+    }
+
+    type PaperAIAnalysis {
+        paperId: ID!
+        score: Float!
+        summary: String!
+        relevance: String!
+        keyFindings: [String!]!
+        methodology: String!
     }
 
     type Query {
@@ -72,6 +88,10 @@ const typeDefs = `
         searchResearchPapers(
             researchId: ID!
         ): ResearchSearchResult!
+
+        analyzePaper(
+            paperId: ID!
+        ): PaperAIAnalysis!
 
         deleteResearch(
             researchId: ID!

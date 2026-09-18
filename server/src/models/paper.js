@@ -73,6 +73,32 @@ const paperSchema = new mongoose.Schema(
             type: Number,
             default: null,
         },
+
+        // AI-generated analysis
+        aiSummary: {
+            type: String,
+            default: "",
+        },
+
+        aiRelevance: {
+            type: String,
+            default: "",
+        },
+
+        aiKeyFindings: {
+            type: [String],
+            default: [],
+        },
+
+        aiMethodology: {
+            type: String,
+            default: "",
+        },
+
+        aiAnalyzedAt: {
+            type: Date,
+            default: null,
+        },
     },
     {
         timestamps: true,

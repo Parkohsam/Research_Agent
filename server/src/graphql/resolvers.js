@@ -15,13 +15,18 @@ const {
     validateResearchTopic,
 } = require("../services/topicValidationService");
 
+const {
+    analyzePaperWithAI,
+} = require("../services/aiAnalysisService");
+
 const resolvers = {
     User: {
         id: (user) => user._id.toString(),
     },
 
     Research: {
-        id: (research) => research._id.toString(),
+        id: (research) =>
+            research._id.toString(),
 
         userId: (research) =>
             research.userId.toString(),
@@ -42,10 +47,16 @@ const resolvers = {
     },
 
     Paper: {
-        id: (paper) => paper._id.toString(),
+        id: (paper) =>
+            paper._id.toString(),
 
         researchId: (paper) =>
             paper.researchId.toString(),
+
+        aiAnalyzedAt: (paper) =>
+            paper.aiAnalyzedAt
+                ? paper.aiAnalyzedAt.toISOString()
+                : null,
 
         createdAt: (paper) =>
             paper.createdAt.toISOString(),
@@ -79,18 +90,25 @@ const resolvers = {
             });
         },
 
-        researchPapers: async (_, args, context) => {
+        researchPapers: async (
+            _,
+            args,
+            context
+        ) => {
             if (!context.user) {
                 throw new Error("Unauthorized");
             }
 
-            const research = await Research.findOne({
-                _id: args.researchId,
-                userId: context.user._id,
-            });
+            const research =
+                await Research.findOne({
+                    _id: args.researchId,
+                    userId: context.user._id,
+                });
 
             if (!research) {
-                throw new Error("Research not found");
+                throw new Error(
+                    "Research not found"
+                );
             }
 
             return Paper.find({
@@ -110,7 +128,11 @@ const resolvers = {
             return loginUser(args);
         },
 
-        createResearch: async (_, args, context) => {
+        createResearch: async (
+            _,
+            args,
+            context
+        ) => {
             if (!context.user) {
                 throw new Error("Unauthorized");
             }
@@ -121,7 +143,9 @@ const resolvers = {
                 validateResearchTopic(title);
 
             if (!validation.valid) {
-                throw new Error(validation.message);
+                throw new Error(
+                    validation.message
+                );
             }
 
             return Research.create({
@@ -140,13 +164,16 @@ const resolvers = {
                 throw new Error("Unauthorized");
             }
 
-            const research = await Research.findOne({
-                _id: args.researchId,
-                userId: context.user._id,
-            });
+            const research =
+                await Research.findOne({
+                    _id: args.researchId,
+                    userId: context.user._id,
+                });
 
             if (!research) {
-                throw new Error("Research not found");
+                throw new Error(
+                    "Research not found"
+                );
             }
 
             research.status = "processing";
@@ -166,11 +193,14 @@ const resolvers = {
                 for (const paper of normalizedPapers) {
                     await Paper.findOneAndUpdate(
                         {
-                            researchId: research._id,
-                            openAlexId: paper.openAlexId,
+                            researchId:
+                                research._id,
+                            openAlexId:
+                                paper.openAlexId,
                         },
                         {
-                            researchId: research._id,
+                            researchId:
+                                research._id,
                             ...paper,
                         },
                         {
@@ -187,6 +217,7 @@ const resolvers = {
                 return {
                     researchId:
                         research._id.toString(),
+
                     totalFound:
                         normalizedPapers.length,
                 };
@@ -205,26 +236,148 @@ const resolvers = {
             }
         },
 
-        deleteResearch: async (_, args, context) => {
+        /* ---------------------------------- */
+        /* AI Paper Analysis                  */
+        /* ---------------------------------- */
+
+        analyzePaper: async (
+            _,
+            args,
+            context
+        ) => {
             if (!context.user) {
                 throw new Error("Unauthorized");
             }
 
-            const research = await Research.findOne({
-                _id: args.researchId,
-                userId: context.user._id,
-            });
+            const paper =
+                await Paper.findById(
+                    args.paperId
+                );
 
-            if (!research) {
-                throw new Error("Research not found");
+            if (!paper) {
+                throw new Error(
+                    "Paper not found"
+                );
             }
 
-            // Delete all papers belonging to this research
+            const research =
+                await Research.findOne({
+                    _id: paper.researchId,
+                    userId: context.user._id,
+                });
+
+            if (!research) {
+                throw new Error(
+                    "You do not have access to this paper."
+                );
+            }
+
+            try {
+                const analysis =
+                    await analyzePaperWithAI({
+                        researchTopic:
+                            research.title,
+
+                        title: paper.title,
+
+                        abstract:
+                            paper.abstract,
+                    });
+
+                paper.aiScore =
+                    analysis.score;
+
+                paper.aiSummary =
+                    analysis.summary;
+
+                paper.aiRelevance =
+                    analysis.relevance;
+
+                paper.aiKeyFindings =
+                    analysis.keyFindings;
+
+                paper.aiMethodology =
+                    analysis.methodology;
+
+                paper.aiAnalyzedAt =
+                    new Date();
+
+                if (analysis.score >= 80) {
+                    paper.evaluationStatus =
+                        "recommended";
+                } else if (
+                    analysis.score >= 60
+                ) {
+                    paper.evaluationStatus =
+                        "candidate";
+                } else {
+                    paper.evaluationStatus =
+                        "rejected";
+                }
+
+                await paper.save();
+
+                return {
+                    paperId:
+                        paper._id.toString(),
+
+                    score:
+                        analysis.score,
+
+                    summary:
+                        analysis.summary,
+
+                    relevance:
+                        analysis.relevance,
+
+                    keyFindings:
+                        analysis.keyFindings,
+
+                    methodology:
+                        analysis.methodology,
+                };
+            } catch (error) {
+                console.error(
+                    "AI paper analysis failed:",
+                    error
+                );
+
+                throw new Error(
+                    error.message ||
+                        "Unable to analyze paper with AI."
+                );
+            }
+        },
+
+        /* ---------------------------------- */
+        /* Delete Research                    */
+        /* ---------------------------------- */
+
+        deleteResearch: async (
+            _,
+            args,
+            context
+        ) => {
+            if (!context.user) {
+                throw new Error("Unauthorized");
+            }
+
+            const research =
+                await Research.findOne({
+                    _id: args.researchId,
+                    userId: context.user._id,
+                });
+
+            if (!research) {
+                throw new Error(
+                    "Research not found"
+                );
+            }
+
             await Paper.deleteMany({
                 researchId: research._id,
             });
 
-            // Delete the research itself
             await Research.deleteOne({
                 _id: research._id,
             });
