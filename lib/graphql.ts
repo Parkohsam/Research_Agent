@@ -229,17 +229,12 @@ export type Paper = {
     evaluationStatus: string;
 
     aiScore: number | null;
-
     relevanceScore: number | null;
 
     aiSummary: string | null;
-
     aiRelevance: string | null;
-
     aiKeyFindings: string[];
-
     aiMethodology: string | null;
-
     aiAnalyzedAt: string | null;
 
     createdAt: string;
