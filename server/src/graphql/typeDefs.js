@@ -32,13 +32,7 @@ const typeDefs = `
         isOpenAccess: Boolean!
         evaluationStatus: String!
         aiScore: Float
-
-        aiSummary: String
-        aiRelevance: String
-        aiKeyFindings: [String!]!
-        aiMethodology: String
-        aiAnalyzedAt: String
-
+        relevanceScore: Float
         createdAt: String!
         updatedAt: String!
     }
@@ -48,25 +42,29 @@ const typeDefs = `
         totalFound: Int!
     }
 
+    type ResearchPapersResult {
+        papers: [Paper!]!
+        total: Int!
+        page: Int!
+        limit: Int!
+        hasMore: Boolean!
+    }
+
     type AuthPayload {
         token: String!
         user: User!
-    }
-
-    type PaperAIAnalysis {
-        paperId: ID!
-        score: Float!
-        summary: String!
-        relevance: String!
-        keyFindings: [String!]!
-        methodology: String!
     }
 
     type Query {
         hello: String
         me: User
         myResearch: [Research!]!
-        researchPapers(researchId: ID!): [Paper!]!
+
+        researchPapers(
+            researchId: ID!
+            page: Int
+            limit: Int
+        ): ResearchPapersResult!
     }
 
     type Mutation {
@@ -88,10 +86,6 @@ const typeDefs = `
         searchResearchPapers(
             researchId: ID!
         ): ResearchSearchResult!
-
-        analyzePaper(
-            paperId: ID!
-        ): PaperAIAnalysis!
 
         deleteResearch(
             researchId: ID!
