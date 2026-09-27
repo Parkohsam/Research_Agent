@@ -13,39 +13,66 @@ const searchAndSaveResearchPapers = async (researchId) => {
         throw new Error("Research not found");
     }
 
-    const openAlexPapers = await searchAcademicPapers(research.title);
+    /*
+     * Search OpenAlex and apply our relevance filtering.
+     */
+    const openAlexPapers = await searchAcademicPapers(
+        research.title
+    );
 
-    const normalizedPapers = openAlexPapers.map(normalizeAcademicPaper);
+    const normalizedPapers =
+        openAlexPapers.map(normalizeAcademicPaper);
 
-    const papersToSave = normalizedPapers.map((paper) => ({
-        researchId: research._id,
-        ...paper,
-    }));
+    /*
+     * Convert papers into MongoDB documents.
+     */
+    const papersToSave = normalizedPapers.map(
+        (paper) => ({
+            researchId: research._id,
+            ...paper,
+        })
+    );
 
+    /*
+     * Save/update papers.
+     */
     if (papersToSave.length > 0) {
         await Paper.bulkWrite(
             papersToSave.map((paper) => ({
                 updateOne: {
                     filter: {
-                        researchId: paper.researchId,
-                        openAlexId: paper.openAlexId,
+                        researchId:
+                            paper.researchId,
+
+                        openAlexId:
+                            paper.openAlexId,
                     },
+
                     update: {
                         $set: paper,
                     },
+
                     upsert: true,
                 },
             }))
         );
     }
 
-    await Research.findByIdAndUpdate(researchId, {
-        status: "completed",
-    });
+    /*
+     * Mark research as completed.
+     */
+    await Research.findByIdAndUpdate(
+        researchId,
+        {
+            status: "completed",
+        }
+    );
 
     return {
         researchId: research._id,
-        totalFound: normalizedPapers.length,
+
+        totalFound:
+            normalizedPapers.length,
     };
 };
 
