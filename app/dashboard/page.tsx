@@ -77,13 +77,6 @@ export default function Dashboard({
                 return;
             }
 
-            if (!append) {
-                setPapers([]);
-                setCurrentPage(1);
-                setTotalPapers(0);
-                setHasMore(false);
-            }
-
             try {
                 setError("");
 
@@ -173,18 +166,26 @@ export default function Dashboard({
      */
     useEffect(() => {
         if (!selectedResearch) {
+            setPapers([]);
+            setCurrentPage(1);
+            setTotalPapers(0);
+            setHasMore(false);
+            setError("");
+
             return;
         }
 
-        const timeoutId = window.setTimeout(() => {
-            void loadPapers(
-                selectedResearch.id,
-                1,
-                false
-            );
-        }, 0);
+        setPapers([]);
+        setCurrentPage(1);
+        setTotalPapers(0);
+        setHasMore(false);
+        setError("");
 
-        return () => window.clearTimeout(timeoutId);
+        loadPapers(
+            selectedResearch.id,
+            1,
+            false
+        );
     }, [
         selectedResearch,
         loadPapers,
