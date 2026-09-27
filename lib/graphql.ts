@@ -1,4 +1,5 @@
-const GRAPHQL_URL = process.env.NEXT_PUBLIC_GRAPHQL_URL;
+const GRAPHQL_URL =
+    process.env.NEXT_PUBLIC_GRAPHQL_URL;
 
 type GraphQLError = {
     message: string;
@@ -110,6 +111,7 @@ export async function signupUser(
                 password: $password
             ) {
                 token
+
                 user {
                     id
                     name
@@ -152,6 +154,7 @@ export async function loginUser(
                 password: $password
             ) {
                 token
+
                 user {
                     id
                     name
@@ -227,6 +230,8 @@ export type Paper = {
 
     aiScore: number | null;
 
+    relevanceScore: number | null;
+
     aiSummary: string | null;
 
     aiRelevance: string | null;
@@ -274,9 +279,11 @@ export async function createResearch(
                 userId
                 title
                 status
+
                 papers {
                     id
                 }
+
                 createdAt
                 updatedAt
             }
@@ -308,9 +315,11 @@ export async function getMyResearch(
                 userId
                 title
                 status
+
                 papers {
                     id
                 }
+
                 createdAt
                 updatedAt
             }
@@ -369,50 +378,72 @@ export async function searchResearchPapers(
 /* Get Research Papers                */
 /* ---------------------------------- */
 
+export type ResearchPapersResult = {
+    papers: Paper[];
+    total: number;
+    page: number;
+    limit: number;
+    hasMore: boolean;
+};
+
 export type ResearchPapersResponse = {
-    researchPapers: Paper[];
+    researchPapers: ResearchPapersResult;
 };
 
 export async function getResearchPapers(
     researchId: string,
-    token: string
+    token: string,
+    page = 1,
+    limit = 5
 ) {
     const query = `
         query ResearchPapers(
             $researchId: ID!
+            $page: Int
+            $limit: Int
         ) {
             researchPapers(
                 researchId: $researchId
+                page: $page
+                limit: $limit
             ) {
-                id
-                researchId
-                openAlexId
+                papers {
+                    id
+                    researchId
+                    openAlexId
 
-                title
-                abstract
+                    title
+                    abstract
 
-                publicationYear
-                doi
+                    publicationYear
+                    doi
 
-                authors
+                    authors
 
-                journal
-                sourceUrl
+                    journal
+                    sourceUrl
 
-                citationCount
-                isOpenAccess
+                    citationCount
+                    isOpenAccess
 
-                evaluationStatus
-                aiScore
+                    evaluationStatus
+                    aiScore
+                    relevanceScore
 
-                aiSummary
-                aiRelevance
-                aiKeyFindings
-                aiMethodology
-                aiAnalyzedAt
+                    aiSummary
+                    aiRelevance
+                    aiKeyFindings
+                    aiMethodology
+                    aiAnalyzedAt
 
-                createdAt
-                updatedAt
+                    createdAt
+                    updatedAt
+                }
+
+                total
+                page
+                limit
+                hasMore
             }
         }
     `;
@@ -421,6 +452,8 @@ export async function getResearchPapers(
         query,
         {
             researchId,
+            page,
+            limit,
         },
         {
             Authorization: `Bearer ${token}`,
