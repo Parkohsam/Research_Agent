@@ -21,18 +21,32 @@ const typeDefs = `
         id: ID!
         researchId: ID!
         openAlexId: String!
+
         title: String!
         abstract: String
+
         publicationYear: Int
         doi: String
+
         authors: [String!]!
+
         journal: String
         sourceUrl: String
+
         citationCount: Int!
         isOpenAccess: Boolean!
+
+        relevanceScore: Float
+
         evaluationStatus: String!
         aiScore: Float
-        relevanceScore: Float
+
+        aiSummary: String
+        aiRelevance: String
+        aiKeyFindings: [String!]!
+        aiMethodology: String
+        aiAnalyzedAt: String
+
         createdAt: String!
         updatedAt: String!
     }

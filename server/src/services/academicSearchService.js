@@ -1,9 +1,5 @@
 const OPENALEX_API_URL = "https://api.openalex.org/works";
 
-/*
- * Words that usually don't carry useful meaning when
- * determining research-topic relevance.
- */
 const STOP_WORDS = new Set([
     "a",
     "an",
@@ -41,165 +37,8 @@ const STOP_WORDS = new Set([
     "approach",
     "methods",
     "method",
-    "application",
-    "applications",
-    "system",
-    "systems",
-    "paper",
-    "investigate",
-    "investigating",
 ]);
 
-/*
- * Domain vocabulary.
- *
- * This is especially important for topics that combine
- * two or more research areas.
- *
- * Example:
- *
- * "biotechnology + artificial intelligence"
- *
- * requires evidence from BOTH groups.
- */
-const DOMAIN_GROUPS = {
-    biotechnology: [
-        "biotechnology",
-        "bioinformatics",
-        "genomics",
-        "genomic",
-        "proteomics",
-        "proteomic",
-        "molecular biology",
-        "molecular biology",
-        "synthetic biology",
-        "systems biology",
-        "computational biology",
-        "gene editing",
-        "gene sequencing",
-        "dna sequencing",
-        "rna sequencing",
-        "next generation sequencing",
-        "ngs",
-        "protein engineering",
-        "protein structure",
-        "bioprocess",
-        "bioprocessing",
-        "fermentation",
-        "metabolic engineering",
-        "genetic engineering",
-        "genetic modification",
-        "gene expression",
-        "drug discovery",
-        "drug development",
-        "biological engineering",
-        "cell engineering",
-        "cell culture",
-        "biomolecule",
-        "biomolecular",
-    ],
-
-    artificialIntelligence: [
-        "artificial intelligence",
-        "machine learning",
-        "deep learning",
-        "neural network",
-        "neural networks",
-        "computer vision",
-        "natural language processing",
-        "nlp",
-        "reinforcement learning",
-        "generative ai",
-        "large language model",
-        "large language models",
-        "llm",
-        "transformer",
-        "predictive model",
-        "predictive modeling",
-        "intelligent system",
-        "intelligent systems",
-        "machine intelligence",
-    ],
-
-    healthcare: [
-        "healthcare",
-        "health care",
-        "clinical",
-        "medicine",
-        "medical",
-        "hospital",
-        "patient",
-        "diagnosis",
-        "diagnostic",
-        "treatment",
-        "public health",
-    ],
-
-    agriculture: [
-        "agriculture",
-        "agricultural",
-        "crop",
-        "crops",
-        "plant",
-        "plants",
-        "farming",
-        "precision agriculture",
-        "precision farming",
-        "soil",
-        "livestock",
-        "agronomy",
-    ],
-
-    food: [
-        "food",
-        "food safety",
-        "food quality",
-        "food processing",
-        "food production",
-        "foodborne",
-        "foodborne disease",
-        "food contamination",
-    ],
-
-    environment: [
-        "environment",
-        "environmental",
-        "climate",
-        "climate change",
-        "pollution",
-        "ecosystem",
-        "biodiversity",
-        "water quality",
-        "air quality",
-    ],
-
-    cybersecurity: [
-        "cybersecurity",
-        "cyber security",
-        "cyber attack",
-        "cyber attacks",
-        "malware",
-        "phishing",
-        "network security",
-        "information security",
-        "intrusion detection",
-    ],
-
-    finance: [
-        "finance",
-        "financial",
-        "banking",
-        "stock market",
-        "investment",
-        "credit",
-        "fintech",
-        "financial market",
-    ],
-};
-
-/*
- * Normalize text so matching is consistent.
- */
 const normalizeText = (text = "") =>
     text
         .toLowerCase()
@@ -207,9 +46,6 @@ const normalizeText = (text = "") =>
         .replace(/\s+/g, " ")
         .trim();
 
-/*
- * Convert text into useful individual words.
- */
 const tokenize = (text = "") => {
     return normalizeText(text)
         .split(" ")
@@ -221,9 +57,48 @@ const tokenize = (text = "") => {
         );
 };
 
-/*
- * Reconstruct OpenAlex abstract.
- */
+const buildImportantTerms = (topic) => {
+    const normalizedTopic = normalizeText(topic);
+
+    const words = tokenize(normalizedTopic);
+
+    const phrases = [];
+
+    // Keep the original topic as a phrase.
+    if (normalizedTopic.length >= 8) {
+        phrases.push(normalizedTopic);
+    }
+
+    // Generate useful 2-word phrases.
+    for (let i = 0; i < words.length - 1; i++) {
+        const phrase = `${words[i]} ${words[i + 1]}`;
+
+        if (
+            phrase.length >= 8 &&
+            !phrases.includes(phrase)
+        ) {
+            phrases.push(phrase);
+        }
+    }
+
+    // Generate useful 3-word phrases.
+    for (let i = 0; i < words.length - 2; i++) {
+        const phrase = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
+
+        if (
+            phrase.length >= 12 &&
+            !phrases.includes(phrase)
+        ) {
+            phrases.push(phrase);
+        }
+    }
+
+    return {
+        words: [...new Set(words)],
+        phrases,
+    };
+};
+
 const reconstructAbstract = (abstractInvertedIndex) => {
     if (!abstractInvertedIndex) {
         return "";
@@ -242,163 +117,6 @@ const reconstructAbstract = (abstractInvertedIndex) => {
     return words.filter(Boolean).join(" ");
 };
 
-/*
- * Check whether a phrase/term exists as a real word or phrase.
- *
- * This prevents things such as:
- *
- * "ai" matching inside another word.
- */
-const containsTerm = (text, term) => {
-    const normalizedText = normalizeText(text);
-    const normalizedTerm = normalizeText(term);
-
-    if (!normalizedText || !normalizedTerm) {
-        return false;
-    }
-
-    const escapedTerm = normalizedTerm.replace(
-        /[.*+?^${}()|[\]\\]/g,
-        "\\$&"
-    );
-
-    const regex = new RegExp(
-        `(^|\\s)${escapedTerm}(?=\\s|$)`,
-        "i"
-    );
-
-    return regex.test(normalizedText);
-};
-
-/*
- * Find which domain groups are represented in the
- * user's research topic.
- */
-const detectTopicDomains = (topic) => {
-    const normalizedTopic = normalizeText(topic);
-
-    const detectedDomains = [];
-
-    for (const [domain, terms] of Object.entries(
-        DOMAIN_GROUPS
-    )) {
-        const matchedTerms = terms.filter((term) =>
-            containsTerm(normalizedTopic, term)
-        );
-
-        if (matchedTerms.length > 0) {
-            detectedDomains.push({
-                domain,
-                matchedTerms,
-            });
-        }
-    }
-
-    return detectedDomains;
-};
-
-/*
- * Build important words and phrases from the user's topic.
- */
-const buildImportantTerms = (topic) => {
-    const normalizedTopic = normalizeText(topic);
-
-    const words = tokenize(normalizedTopic);
-
-    const phrases = [];
-
-    /*
-     * Keep important domain phrases.
-     */
-    for (const terms of Object.values(DOMAIN_GROUPS)) {
-        for (const term of terms) {
-            if (containsTerm(normalizedTopic, term)) {
-                phrases.push(term);
-            }
-        }
-    }
-
-    /*
-     * Add the original topic.
-     */
-    if (
-        normalizedTopic.length >= 8 &&
-        !phrases.includes(normalizedTopic)
-    ) {
-        phrases.push(normalizedTopic);
-    }
-
-    /*
-     * Generate 2-word phrases.
-     */
-    for (let i = 0; i < words.length - 1; i++) {
-        const phrase = `${words[i]} ${words[i + 1]}`;
-
-        if (
-            phrase.length >= 8 &&
-            !phrases.includes(phrase)
-        ) {
-            phrases.push(phrase);
-        }
-    }
-
-    /*
-     * Generate 3-word phrases.
-     */
-    for (let i = 0; i < words.length - 2; i++) {
-        const phrase =
-            `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
-
-        if (
-            phrase.length >= 12 &&
-            !phrases.includes(phrase)
-        ) {
-            phrases.push(phrase);
-        }
-    }
-
-    return {
-        words: [...new Set(words)],
-        phrases: [...new Set(phrases)],
-    };
-};
-
-/*
- * Determine whether a paper contains evidence for a
- * particular domain.
- */
-const getDomainMatch = (text, domainTerms) => {
-    const matchedTerms = domainTerms.filter((term) =>
-        containsTerm(text, term)
-    );
-
-    return {
-        matched: matchedTerms.length > 0,
-        matchedTerms,
-    };
-};
-
-/*
- * Calculate how relevant a paper is to the research topic.
- *
- * Important:
- *
- * For multi-domain topics, the paper must demonstrate
- * evidence from the important domains.
- *
- * Example:
- *
- * Topic:
- * "biotechnology and artificial intelligence"
- *
- * Paper:
- * "Artificial Intelligence in Dentistry"
- *
- * AI = YES
- * Biotechnology = NO
- *
- * Therefore the paper is rejected.
- */
 const calculateRelevanceScore = (paper, topic) => {
     const title = normalizeText(
         paper.display_name || ""
@@ -410,86 +128,20 @@ const calculateRelevanceScore = (paper, topic) => {
         )
     );
 
-    const combinedText =
-        `${title} ${abstract}`.trim();
+    const combinedText = `${title} ${abstract}`;
 
-    if (!combinedText) {
-        return {
-            score: 0,
-            passed: false,
-            matchedDomains: [],
-            matchedTerms: [],
-        };
+    const { words, phrases } =
+        buildImportantTerms(topic);
+
+    if (!combinedText.trim()) {
+        return 0;
     }
 
-    const {
-        words,
-        phrases,
-    } = buildImportantTerms(topic);
-
-    const topicDomains =
-        detectTopicDomains(topic);
+    let score = 0;
 
     /*
-     * --------------------------------------------------
-     * 1. DOMAIN COVERAGE
-     * --------------------------------------------------
+     * TITLE MATCHING
      */
-
-    const matchedDomains = [];
-    const matchedTerms = [];
-
-    for (const domainInfo of topicDomains) {
-        const result = getDomainMatch(
-            combinedText,
-            DOMAIN_GROUPS[domainInfo.domain]
-        );
-
-        if (result.matched) {
-            matchedDomains.push(
-                domainInfo.domain
-            );
-
-            matchedTerms.push(
-                ...result.matchedTerms
-            );
-        }
-    }
-
-    /*
-     * For a multi-domain topic, require all detected
-     * domains to be represented.
-     *
-     * Example:
-     *
-     * Biotechnology + AI
-     *
-     * Both must appear conceptually.
-     */
-    const requiresAllDomains =
-        topicDomains.length >= 2;
-
-    if (
-        requiresAllDomains &&
-        matchedDomains.length <
-            topicDomains.length
-    ) {
-        return {
-            score: 0,
-            passed: false,
-            matchedDomains,
-            matchedTerms: [
-                ...new Set(matchedTerms),
-            ],
-        };
-    }
-
-    /*
-     * --------------------------------------------------
-     * 2. TITLE MATCHING
-     * --------------------------------------------------
-     */
-
     const titleWords = new Set(
         tokenize(title)
     );
@@ -502,40 +154,34 @@ const calculateRelevanceScore = (paper, topic) => {
         }
     }
 
-    const titleScore =
-        words.length > 0
-            ? titleMatches / words.length
-            : 0;
+    if (words.length > 0) {
+        score +=
+            (titleMatches / words.length) * 0.45;
+    }
 
     /*
-     * --------------------------------------------------
-     * 3. ABSTRACT / CONTENT MATCHING
-     * --------------------------------------------------
+     * ABSTRACT MATCHING
      */
-
     const matchedWords = words.filter(
         (word) =>
-            titleWords.has(word) ||
-            containsTerm(abstract, word)
+            combinedText.includes(word)
     );
 
-    const contentScore =
-        words.length > 0
-            ? matchedWords.length / words.length
-            : 0;
+    if (words.length > 0) {
+        score +=
+            (matchedWords.length / words.length) *
+            0.3;
+    }
 
     /*
-     * --------------------------------------------------
-     * 4. PHRASE MATCHING
-     * --------------------------------------------------
+     * PHRASE MATCHING
      */
-
     let phraseMatches = 0;
 
     for (const phrase of phrases) {
         if (
             phrase !== normalizeText(topic) &&
-            containsTerm(combinedText, phrase)
+            combinedText.includes(phrase)
         ) {
             phraseMatches++;
         }
@@ -546,138 +192,27 @@ const calculateRelevanceScore = (paper, topic) => {
             phrase !== normalizeText(topic)
     );
 
-    const phraseScore =
-        usablePhrases.length > 0
-            ? phraseMatches /
-              usablePhrases.length
-            : 0;
-
-    /*
-     * --------------------------------------------------
-     * 5. DOMAIN SCORE
-     * --------------------------------------------------
-     */
-
-    const domainScore =
-        topicDomains.length > 0
-            ? matchedDomains.length /
-              topicDomains.length
-            : 0;
-
-    /*
-     * --------------------------------------------------
-     * 6. EXACT TOPIC MATCH
-     * --------------------------------------------------
-     */
-
-    const exactTopicMatch =
-        containsTerm(
-            combinedText,
-            normalizeText(topic)
-        );
-
-    /*
-     * --------------------------------------------------
-     * FINAL SCORE
-     * --------------------------------------------------
-     *
-     * Domain coverage receives significant weight.
-     * This is what prevents unrelated AI papers from
-     * appearing for biotechnology + AI topics.
-     */
-
-    let score =
-        titleScore * 0.25 +
-        contentScore * 0.25 +
-        phraseScore * 0.15 +
-        domainScore * 0.35;
-
-    /*
-     * Small bonus for exact topic match.
-     */
-    if (exactTopicMatch) {
-        score += 0.10;
+    if (usablePhrases.length > 0) {
+        score +=
+            (phraseMatches /
+                usablePhrases.length) *
+            0.2;
     }
 
-    score = Math.min(score, 1);
-
     /*
-     * --------------------------------------------------
-     * MINIMUM RELEVANCE
-     * --------------------------------------------------
-     */
-
-    const passed =
-        requiresAllDomains
-            ? score >= 0.45
-            : score >= 0.30;
-
-    return {
-        score,
-        passed,
-        matchedDomains,
-        matchedTerms: [
-            ...new Set(matchedTerms),
-        ],
-    };
-};
-
-/*
- * Build additional search queries for OpenAlex.
- *
- * The original query is always included.
- */
-const buildSearchQueries = (topic) => {
-    const normalizedTopic =
-        normalizeText(topic);
-
-    const queries = [
-        normalizedTopic,
-    ];
-
-    const domains =
-        detectTopicDomains(normalizedTopic);
-
-    /*
-     * Add focused searches for detected domains.
+     * EXACT TOPIC MATCH
      */
     if (
-        domains.some(
-            (domain) =>
-                domain.domain ===
-                "biotechnology"
-        ) &&
-        domains.some(
-            (domain) =>
-                domain.domain ===
-                "artificialIntelligence"
+        combinedText.includes(
+            normalizeText(topic)
         )
     ) {
-        queries.push(
-            "biotechnology artificial intelligence",
-            "biotechnology machine learning",
-            "bioinformatics artificial intelligence",
-            "genomics machine learning",
-            "synthetic biology artificial intelligence",
-            "computational biology machine learning",
-            "protein engineering machine learning",
-            "genomics artificial intelligence"
-        );
+        score += 0.15;
     }
 
-    /*
-     * Remove duplicates.
-     */
-    return [
-        ...new Set(
-            queries.filter(Boolean)
-        ),
-    ];
+    return Math.min(score, 1);
 };
 
-/*
- * Search OpenAlex.
- */
 const searchAcademicPapers = async (topic) => {
     const trimmedTopic = topic.trim();
 
@@ -687,125 +222,74 @@ const searchAcademicPapers = async (topic) => {
         );
     }
 
-    const searchQueries =
-        buildSearchQueries(trimmedTopic);
+    const url = new URL(
+        OPENALEX_API_URL
+    );
 
     /*
-     * Search several focused queries instead of
-     * depending on one broad OpenAlex query.
+     * Request a larger candidate pool.
      */
-    const queryResults =
-        await Promise.all(
-            searchQueries.map(
-                async (searchQuery) => {
-                    const url =
-                        new URL(
-                            OPENALEX_API_URL
-                        );
+    url.searchParams.set(
+        "search",
+        trimmedTopic
+    );
 
-                    url.searchParams.set(
-                        "search",
-                        searchQuery
-                    );
+    url.searchParams.set(
+        "per-page",
+        "100"
+    );
 
-                    url.searchParams.set(
-                        "per-page",
-                        "50"
-                    );
+    url.searchParams.set(
+        "select",
+        [
+            "id",
+            "display_name",
+            "publication_year",
+            "doi",
+            "authorships",
+            "primary_location",
+            "open_access",
+            "cited_by_count",
+            "abstract_inverted_index",
+        ].join(",")
+    );
 
-                    url.searchParams.set(
-                        "select",
-                        [
-                            "id",
-                            "display_name",
-                            "publication_year",
-                            "doi",
-                            "authorships",
-                            "primary_location",
-                            "open_access",
-                            "cited_by_count",
-                            "abstract_inverted_index",
-                        ].join(",")
-                    );
+    const response = await fetch(url);
 
-                    const response =
-                        await fetch(url);
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `OpenAlex request failed with status ${response.status}`
-                        );
-                    }
-
-                    const data =
-                        await response.json();
-
-                    return data.results || [];
-                }
-            )
+    if (!response.ok) {
+        throw new Error(
+            `OpenAlex request failed with status ${response.status}`
         );
-
-    /*
-     * Combine all results.
-     */
-    const allResults =
-        queryResults.flat();
-
-    /*
-     * Remove duplicate papers.
-     */
-    const uniquePapers = new Map();
-
-    for (const paper of allResults) {
-        if (
-            paper.id &&
-            !uniquePapers.has(paper.id)
-        ) {
-            uniquePapers.set(
-                paper.id,
-                paper
-            );
-        }
     }
 
-    /*
-     * Score every candidate.
-     */
-    const scoredResults = [
-        ...uniquePapers.values(),
-    ].map((paper) => {
-        const relevance =
-            calculateRelevanceScore(
-                paper,
-                trimmedTopic
-            );
+    const data = await response.json();
 
-        return {
+    const results = data.results || [];
+
+    /*
+     * Calculate relevance.
+     */
+    const scoredResults = results.map(
+        (paper) => ({
             ...paper,
 
             relevanceScore:
-                relevance.score,
-
-            relevancePassed:
-                relevance.passed,
-
-            matchedDomains:
-                relevance.matchedDomains,
-
-            matchedTerms:
-                relevance.matchedTerms,
-        };
-    });
+                calculateRelevanceScore(
+                    paper,
+                    trimmedTopic
+                ),
+        })
+    );
 
     /*
-     * Keep only papers that actually passed
-     * our relevance test.
+     * Remove weak results.
      */
     const relevantResults =
         scoredResults
             .filter(
                 (paper) =>
-                    paper.relevancePassed
+                    paper.relevanceScore >=
+                    0.25
             )
             .sort(
                 (a, b) =>
@@ -814,7 +298,7 @@ const searchAcademicPapers = async (topic) => {
             );
 
     /*
-     * Return the strongest 25 papers.
+     * Return strongest 25.
      */
     return relevantResults.slice(
         0,
@@ -822,10 +306,9 @@ const searchAcademicPapers = async (topic) => {
     );
 };
 
-/*
- * Normalize paper for MongoDB.
- */
-const normalizeAcademicPaper = (paper) => {
+const normalizeAcademicPaper = (
+    paper
+) => {
     const source =
         paper.primary_location?.source;
 
@@ -839,7 +322,8 @@ const normalizeAcademicPaper = (paper) => {
             .filter(Boolean);
 
     return {
-        openAlexId: paper.id,
+        openAlexId:
+            paper.id,
 
         title:
             paper.display_name ||

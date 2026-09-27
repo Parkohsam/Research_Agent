@@ -74,6 +74,11 @@ const paperSchema = new mongoose.Schema(
             default: null,
         },
 
+        relevanceScore: {
+            type: Number,
+            default: null,
+        },
+
         // AI-generated analysis
         aiSummary: {
             type: String,
