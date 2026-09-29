@@ -1,4 +1,5 @@
-const OPENALEX_API_URL = "https://api.openalex.org/works";
+const OPENALEX_API_URL =
+    "https://api.openalex.org/works";
 
 const STOP_WORDS = new Set([
     "a",
@@ -58,20 +59,32 @@ const tokenize = (text = "") => {
 };
 
 const buildImportantTerms = (topic) => {
-    const normalizedTopic = normalizeText(topic);
+    const normalizedTopic =
+        normalizeText(topic);
 
-    const words = tokenize(normalizedTopic);
+    const words = tokenize(
+        normalizedTopic
+    );
 
     const phrases = [];
 
-    // Keep the original topic as a phrase.
+    /*
+     * Keep the original topic.
+     */
     if (normalizedTopic.length >= 8) {
         phrases.push(normalizedTopic);
     }
 
-    // Generate useful 2-word phrases.
-    for (let i = 0; i < words.length - 1; i++) {
-        const phrase = `${words[i]} ${words[i + 1]}`;
+    /*
+     * Generate 2-word phrases.
+     */
+    for (
+        let i = 0;
+        i < words.length - 1;
+        i++
+    ) {
+        const phrase =
+            `${words[i]} ${words[i + 1]}`;
 
         if (
             phrase.length >= 8 &&
@@ -81,9 +94,16 @@ const buildImportantTerms = (topic) => {
         }
     }
 
-    // Generate useful 3-word phrases.
-    for (let i = 0; i < words.length - 2; i++) {
-        const phrase = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
+    /*
+     * Generate 3-word phrases.
+     */
+    for (
+        let i = 0;
+        i < words.length - 2;
+        i++
+    ) {
+        const phrase =
+            `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
 
         if (
             phrase.length >= 12 &&
@@ -99,25 +119,37 @@ const buildImportantTerms = (topic) => {
     };
 };
 
-const reconstructAbstract = (abstractInvertedIndex) => {
+const reconstructAbstract = (
+    abstractInvertedIndex
+) => {
     if (!abstractInvertedIndex) {
         return "";
     }
 
     const words = [];
 
-    for (const [word, positions] of Object.entries(
-        abstractInvertedIndex
-    )) {
-        for (const position of positions) {
+    for (
+        const [word, positions] of Object.entries(
+            abstractInvertedIndex
+        )
+    ) {
+        for (
+            const position of positions
+        ) {
             words[position] = word;
         }
     }
 
-    return words.filter(Boolean).join(" ");
+    return words
+        .filter(Boolean)
+        .join(" ");
 };
 
-const calculateRelevanceScore = (paper, topic) => {
+const calculateRelevanceScore = (
+    paper,
+    topic,
+    importantTerms
+) => {
     const title = normalizeText(
         paper.display_name || ""
     );
@@ -128,14 +160,18 @@ const calculateRelevanceScore = (paper, topic) => {
         )
     );
 
-    const combinedText = `${title} ${abstract}`;
-
-    const { words, phrases } =
-        buildImportantTerms(topic);
+    const combinedText =
+        `${title} ${abstract}`;
 
     if (!combinedText.trim()) {
         return 0;
     }
+
+    const {
+        words,
+        phrases,
+        normalizedTopic,
+    } = importantTerms;
 
     let score = 0;
 
@@ -156,43 +192,58 @@ const calculateRelevanceScore = (paper, topic) => {
 
     if (words.length > 0) {
         score +=
-            (titleMatches / words.length) * 0.45;
+            (titleMatches /
+                words.length) *
+            0.45;
     }
 
     /*
-     * ABSTRACT MATCHING
+     * ABSTRACT / CONTENT MATCHING
      */
-    const matchedWords = words.filter(
-        (word) =>
+    let matchedWords = 0;
+
+    for (const word of words) {
+        if (
             combinedText.includes(word)
-    );
+        ) {
+            matchedWords++;
+        }
+    }
 
     if (words.length > 0) {
         score +=
-            (matchedWords.length / words.length) *
+            (matchedWords /
+                words.length) *
             0.3;
     }
 
     /*
      * PHRASE MATCHING
      */
+    const usablePhrases =
+        phrases.filter(
+            (phrase) =>
+                phrase !==
+                normalizedTopic
+        );
+
     let phraseMatches = 0;
 
-    for (const phrase of phrases) {
+    for (
+        const phrase of usablePhrases
+    ) {
         if (
-            phrase !== normalizeText(topic) &&
-            combinedText.includes(phrase)
+            combinedText.includes(
+                phrase
+            )
         ) {
             phraseMatches++;
         }
     }
 
-    const usablePhrases = phrases.filter(
-        (phrase) =>
-            phrase !== normalizeText(topic)
-    );
-
-    if (usablePhrases.length > 0) {
+    if (
+        usablePhrases.length > 0
+    ) {
         score +=
             (phraseMatches /
                 usablePhrases.length) *
@@ -204,7 +255,7 @@ const calculateRelevanceScore = (paper, topic) => {
      */
     if (
         combinedText.includes(
-            normalizeText(topic)
+            normalizedTopic
         )
     ) {
         score += 0.15;
@@ -213,8 +264,11 @@ const calculateRelevanceScore = (paper, topic) => {
     return Math.min(score, 1);
 };
 
-const searchAcademicPapers = async (topic) => {
-    const trimmedTopic = topic.trim();
+const searchAcademicPapers = async (
+    topic
+) => {
+    const trimmedTopic =
+        topic.trim();
 
     if (!trimmedTopic) {
         throw new Error(
@@ -222,23 +276,47 @@ const searchAcademicPapers = async (topic) => {
         );
     }
 
+    /*
+     * Build important terms ONCE.
+     *
+     * Previously this was being
+     * rebuilt for every paper.
+     */
+    const importantTerms =
+        buildImportantTerms(
+            trimmedTopic
+        );
+
     const url = new URL(
         OPENALEX_API_URL
     );
 
     /*
-     * Request a larger candidate pool.
+     * Search OpenAlex.
+     *
+     * We only need a reasonable
+     * candidate pool.
      */
     url.searchParams.set(
         "search",
         trimmedTopic
     );
 
+    /*
+     * 25 candidates is enough for
+     * our first result set and is
+     * significantly lighter than
+     * requesting 100.
+     */
     url.searchParams.set(
         "per-page",
-        "100"
+        "25"
     );
 
+    /*
+     * Request only fields that we
+     * actually use.
+     */
     url.searchParams.set(
         "select",
         [
@@ -254,7 +332,44 @@ const searchAcademicPapers = async (topic) => {
         ].join(",")
     );
 
-    const response = await fetch(url);
+    /*
+     * Prevent an indefinitely slow
+     * OpenAlex request.
+     */
+    const controller =
+        new AbortController();
+
+    const timeout = setTimeout(
+        () => {
+            controller.abort();
+        },
+        15000
+    );
+
+    let response;
+
+    try {
+        response = await fetch(
+            url,
+            {
+                signal:
+                    controller.signal,
+            }
+        );
+    } catch (error) {
+        if (
+            error?.name ===
+            "AbortError"
+        ) {
+            throw new Error(
+                "OpenAlex request timed out. Please try again."
+            );
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
 
     if (!response.ok) {
         throw new Error(
@@ -262,27 +377,34 @@ const searchAcademicPapers = async (topic) => {
         );
     }
 
-    const data = await response.json();
+    const data =
+        await response.json();
 
-    const results = data.results || [];
+    const results =
+        data.results || [];
 
     /*
-     * Calculate relevance.
+     * Score candidates.
+     *
+     * Important terms are reused
+     * instead of recalculated for
+     * every paper.
      */
-    const scoredResults = results.map(
-        (paper) => ({
+    const scoredResults =
+        results.map((paper) => ({
             ...paper,
 
             relevanceScore:
                 calculateRelevanceScore(
                     paper,
-                    trimmedTopic
+                    trimmedTopic,
+                    importantTerms
                 ),
-        })
-    );
+        }));
 
     /*
-     * Remove weak results.
+     * Remove weak results and sort
+     * strongest results first.
      */
     const relevantResults =
         scoredResults
@@ -298,7 +420,7 @@ const searchAcademicPapers = async (topic) => {
             );
 
     /*
-     * Return strongest 25.
+     * Return the strongest 25.
      */
     return relevantResults.slice(
         0,
@@ -344,7 +466,8 @@ const normalizeAcademicPaper = (
         authors,
 
         journal:
-            source?.display_name || "",
+            source?.display_name ||
+            "",
 
         sourceUrl:
             paper.primary_location
