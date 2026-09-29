@@ -8,17 +8,7 @@ import Sidebar from "../components/dashboard/Sidebar";
 import ResearchInput from "../components/dashboard/ResearchInput";
 import ResearchSuggestions from "../components/dashboard/ResearchSuggestions";
 
-import {
-    getCurrentUser,
-    getMyResearch,
-    getResearchPapers,
-    createResearch,
-    searchResearchPapers,
-    deleteResearch,
-    analyzePaper,
-    type Research,
-    type Paper,
-} from "@/lib/graphql";
+import {getCurrentUser,getMyResearch,getResearchPapers,createResearch,searchResearchPapers,deleteResearch,analyzePaper,type Research,type Paper,} from "@/lib/graphql";
 
 const PAPERS_PER_PAGE = 5;
 
@@ -131,16 +121,23 @@ export default function DashboardPage() {
 
     const handleNewResearch = () => {
         setCurrentResearch(null);
+
         setPapers([]);
+
         setPapersFound(0);
+
         setCurrentPage(1);
+
         setHasMorePapers(false);
+
         setLoadingMorePapers(false);
 
         setTopic("");
+
         setSubmittedTopic("");
 
         setTopicError("");
+
         setAiError("");
 
         setAnalyzingPaperId(null);
@@ -212,6 +209,7 @@ export default function DashboardPage() {
             );
         } finally {
             setPapersLoading(false);
+
             setLoadingMorePapers(false);
         }
     };
@@ -232,14 +230,17 @@ export default function DashboardPage() {
         setTopic("");
 
         setTopicError("");
+
         setAiError("");
 
         setAnalyzingPaperId(null);
 
         setPapers([]);
+
         setPapersFound(0);
 
         setCurrentPage(1);
+
         setHasMorePapers(false);
 
         await loadResearchPapers(
@@ -336,12 +337,15 @@ export default function DashboardPage() {
         setLoading(true);
 
         setTopicError("");
+
         setAiError("");
 
         setPapers([]);
+
         setPapersFound(0);
 
         setCurrentPage(1);
+
         setHasMorePapers(false);
 
         setCurrentResearch(null);
@@ -393,6 +397,12 @@ export default function DashboardPage() {
                 1,
                 false
             );
+
+            /*
+             * Clear the input after
+             * successful research creation.
+             */
+            setTopic("");
 
             /*
              * Refresh sidebar research.
@@ -568,6 +578,7 @@ export default function DashboardPage() {
             }
 
             setTopicError("");
+
             setAiError("");
         } catch (error) {
             console.error(
@@ -670,9 +681,7 @@ export default function DashboardPage() {
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-xs font-semibold text-white md:hidden">
                             {userName
                                 ? userName
-                                      .charAt(
-                                          0
-                                      )
+                                      .charAt(0)
                                       .toUpperCase()
                                 : "U"}
                         </div>
@@ -684,24 +693,6 @@ export default function DashboardPage() {
                 {/* ================================= */}
 
                 <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
-
-                    {/* ================================= */}
-                    {/* Submitted Topic                   */}
-                    {/* ================================= */}
-
-                    {submittedTopic && (
-                        <div className="mb-6">
-                            <p className="mb-2 text-sm font-medium text-gray-700">
-                                Research topic
-                            </p>
-
-                            <div className="break-words rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm leading-6 text-gray-800 shadow-sm">
-                                {
-                                    submittedTopic
-                                }
-                            </div>
-                        </div>
-                    )}
 
                     {/* ================================= */}
                     {/* Research Error                    */}
