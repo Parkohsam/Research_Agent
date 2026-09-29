@@ -1,6 +1,9 @@
 const OPENALEX_API_URL =
     "https://api.openalex.org/works";
 
+const OPENALEX_API_KEY =
+    process.env.OPENALEX_API_KEY || "";
+
 const STOP_WORDS = new Set([
     "a",
     "an",
@@ -40,6 +43,12 @@ const STOP_WORDS = new Set([
     "method",
 ]);
 
+/*
+ * ---------------------------------------------------------
+ * TEXT HELPERS
+ * ---------------------------------------------------------
+ */
+
 const normalizeText = (text = "") =>
     text
         .toLowerCase()
@@ -58,25 +67,33 @@ const tokenize = (text = "") => {
         );
 };
 
+/*
+ * ---------------------------------------------------------
+ * BUILD IMPORTANT SEARCH TERMS
+ * ---------------------------------------------------------
+ */
+
 const buildImportantTerms = (topic) => {
     const normalizedTopic =
         normalizeText(topic);
 
-    const words = tokenize(
-        normalizedTopic
-    );
+    const words = [
+        ...new Set(
+            tokenize(normalizedTopic)
+        ),
+    ];
 
     const phrases = [];
 
     /*
-     * Keep the original topic.
+     * Original topic
      */
     if (normalizedTopic.length >= 8) {
         phrases.push(normalizedTopic);
     }
 
     /*
-     * Generate 2-word phrases.
+     * Two-word phrases
      */
     for (
         let i = 0;
@@ -95,7 +112,7 @@ const buildImportantTerms = (topic) => {
     }
 
     /*
-     * Generate 3-word phrases.
+     * Three-word phrases
      */
     for (
         let i = 0;
@@ -114,10 +131,17 @@ const buildImportantTerms = (topic) => {
     }
 
     return {
-        words: [...new Set(words)],
+        normalizedTopic,
+        words,
         phrases,
     };
 };
+
+/*
+ * ---------------------------------------------------------
+ * RECONSTRUCT OPENALEX ABSTRACT
+ * ---------------------------------------------------------
+ */
 
 const reconstructAbstract = (
     abstractInvertedIndex
@@ -129,13 +153,12 @@ const reconstructAbstract = (
     const words = [];
 
     for (
-        const [word, positions] of Object.entries(
+        const [word, positions]
+        of Object.entries(
             abstractInvertedIndex
         )
     ) {
-        for (
-            const position of positions
-        ) {
+        for (const position of positions) {
             words[position] = word;
         }
     }
@@ -145,39 +168,53 @@ const reconstructAbstract = (
         .join(" ");
 };
 
+/*
+ * ---------------------------------------------------------
+ * RELEVANCE SCORE
+ * ---------------------------------------------------------
+ *
+ * The topic terms are passed in instead of rebuilding them
+ * for every paper.
+ * ---------------------------------------------------------
+ */
+
 const calculateRelevanceScore = (
     paper,
-    topic,
-    importantTerms
+    topicTerms
 ) => {
-    const title = normalizeText(
-        paper.display_name || ""
-    );
+    const title =
+        normalizeText(
+            paper.display_name || ""
+        );
 
-    const abstract = normalizeText(
-        reconstructAbstract(
-            paper.abstract_inverted_index
-        )
-    );
+    const abstract =
+        normalizeText(
+            reconstructAbstract(
+                paper.abstract_inverted_index
+            )
+        );
 
     const combinedText =
-        `${title} ${abstract}`;
+        `${title} ${abstract}`.trim();
 
-    if (!combinedText.trim()) {
+    if (!combinedText) {
         return 0;
     }
 
     const {
+        normalizedTopic,
         words,
         phrases,
-        normalizedTopic,
-    } = importantTerms;
+    } = topicTerms;
 
     let score = 0;
 
     /*
+     * -----------------------------------------------------
      * TITLE MATCHING
+     * -----------------------------------------------------
      */
+
     const titleWords = new Set(
         tokenize(title)
     );
@@ -192,14 +229,16 @@ const calculateRelevanceScore = (
 
     if (words.length > 0) {
         score +=
-            (titleMatches /
-                words.length) *
+            (titleMatches / words.length) *
             0.45;
     }
 
     /*
-     * ABSTRACT / CONTENT MATCHING
+     * -----------------------------------------------------
+     * ABSTRACT / COMBINED TEXT MATCHING
+     * -----------------------------------------------------
      */
+
     let matchedWords = 0;
 
     for (const word of words) {
@@ -212,26 +251,25 @@ const calculateRelevanceScore = (
 
     if (words.length > 0) {
         score +=
-            (matchedWords /
-                words.length) *
-            0.3;
+            (matchedWords / words.length) *
+            0.30;
     }
 
     /*
+     * -----------------------------------------------------
      * PHRASE MATCHING
+     * -----------------------------------------------------
      */
+
     const usablePhrases =
         phrases.filter(
             (phrase) =>
-                phrase !==
-                normalizedTopic
+                phrase !== normalizedTopic
         );
 
     let phraseMatches = 0;
 
-    for (
-        const phrase of usablePhrases
-    ) {
+    for (const phrase of usablePhrases) {
         if (
             combinedText.includes(
                 phrase
@@ -241,19 +279,21 @@ const calculateRelevanceScore = (
         }
     }
 
-    if (
-        usablePhrases.length > 0
-    ) {
+    if (usablePhrases.length > 0) {
         score +=
             (phraseMatches /
                 usablePhrases.length) *
-            0.2;
+            0.20;
     }
 
     /*
+     * -----------------------------------------------------
      * EXACT TOPIC MATCH
+     * -----------------------------------------------------
      */
+
     if (
+        normalizedTopic &&
         combinedText.includes(
             normalizedTopic
         )
@@ -264,234 +304,442 @@ const calculateRelevanceScore = (
     return Math.min(score, 1);
 };
 
-const searchAcademicPapers = async (
-    topic
-) => {
-    const trimmedTopic =
-        topic.trim();
+/*
+ * ---------------------------------------------------------
+ * FETCH OPENALEX WITH RETRY + TIMEOUT
+ * ---------------------------------------------------------
+ */
 
-    if (!trimmedTopic) {
-        throw new Error(
-            "Research topic is required"
-        );
+const fetchOpenAlex = async (
+    url,
+    maxRetries = 3
+) => {
+    let lastError = null;
+
+    for (
+        let attempt = 0;
+        attempt < maxRetries;
+        attempt++
+    ) {
+        const controller =
+            new AbortController();
+
+        /*
+         * Don't allow one OpenAlex request
+         * to hang your entire research request.
+         */
+        const timeout =
+            setTimeout(() => {
+                controller.abort();
+            }, 15000);
+
+        try {
+            const headers = {
+                Accept:
+                    "application/json",
+            };
+
+            /*
+             * OpenAlex supports Bearer authentication.
+             *
+             * The API key should be stored in Render
+             * environment variables.
+             */
+            if (OPENALEX_API_KEY) {
+                headers.Authorization =
+                    `Bearer ${OPENALEX_API_KEY}`;
+            }
+
+            const response =
+                await fetch(url, {
+                    method: "GET",
+                    headers,
+                    signal:
+                        controller.signal,
+                });
+
+            clearTimeout(timeout);
+
+            /*
+             * SUCCESS
+             */
+            if (response.ok) {
+                return await response.json();
+            }
+
+            /*
+             * TEMPORARY ERRORS
+             *
+             * 429 = rate limit
+             * 500 = server error
+             * 502 = bad gateway
+             * 503 = service unavailable
+             * 504 = gateway timeout
+             */
+            const retryableStatuses =
+                new Set([
+                    429,
+                    500,
+                    502,
+                    503,
+                    504,
+                ]);
+
+            if (
+                retryableStatuses.has(
+                    response.status
+                )
+            ) {
+                const retryAfter =
+                    response.headers.get(
+                        "retry-after"
+                    );
+
+                let waitTime;
+
+                if (retryAfter) {
+                    const retrySeconds =
+                        Number(
+                            retryAfter
+                        );
+
+                    waitTime =
+                        Number.isFinite(
+                            retrySeconds
+                        )
+                            ? retrySeconds *
+                              1000
+                            : 1000;
+                } else {
+                    /*
+                     * Exponential backoff:
+                     *
+                     * attempt 1 -> 1 second
+                     * attempt 2 -> 2 seconds
+                     * attempt 3 -> 4 seconds
+                     */
+                    waitTime =
+                        Math.pow(
+                            2,
+                            attempt
+                        ) * 1000;
+                }
+
+                console.warn(
+                    `OpenAlex returned ${response.status}. ` +
+                    `Retrying in ${waitTime}ms ` +
+                    `(attempt ${attempt + 1}/${maxRetries})`
+                );
+
+                await new Promise(
+                    (resolve) =>
+                        setTimeout(
+                            resolve,
+                            waitTime
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * NON-RETRYABLE ERROR
+             */
+
+            let errorMessage =
+                `OpenAlex request failed with status ${response.status}`;
+
+            try {
+                const errorData =
+                    await response.json();
+
+                if (
+                    errorData?.message
+                ) {
+                    errorMessage +=
+                        `: ${errorData.message}`;
+                } else if (
+                    errorData?.error
+                ) {
+                    errorMessage +=
+                        `: ${errorData.error}`;
+                }
+            } catch {
+                /*
+                 * Ignore JSON parsing errors.
+                 */
+            }
+
+            throw new Error(
+                errorMessage
+            );
+        } catch (error) {
+            clearTimeout(timeout);
+
+            lastError = error;
+
+            /*
+             * Request timeout
+             */
+            if (
+                error?.name ===
+                "AbortError"
+            ) {
+                console.warn(
+                    `OpenAlex request timed out ` +
+                    `(attempt ${attempt + 1}/${maxRetries})`
+                );
+            } else {
+                console.warn(
+                    `OpenAlex request error: ${error.message}`
+                );
+            }
+
+            /*
+             * Retry network errors / timeouts.
+             *
+             * If it is the final attempt,
+             * throw below.
+             */
+            if (
+                attempt <
+                maxRetries - 1
+            ) {
+                const waitTime =
+                    Math.pow(
+                        2,
+                        attempt
+                    ) * 1000;
+
+                await new Promise(
+                    (resolve) =>
+                        setTimeout(
+                            resolve,
+                            waitTime
+                        )
+                );
+            }
+        }
     }
 
-    /*
-     * Build important terms ONCE.
-     *
-     * Previously this was being
-     * rebuilt for every paper.
-     */
-    const importantTerms =
-        buildImportantTerms(
-            trimmedTopic
-        );
-
-    const url = new URL(
-        OPENALEX_API_URL
+    throw new Error(
+        lastError?.message ||
+            "OpenAlex request failed after multiple attempts"
     );
+};
 
-    /*
-     * Search OpenAlex.
-     *
-     * We only need a reasonable
-     * candidate pool.
-     */
-    url.searchParams.set(
-        "search",
-        trimmedTopic
-    );
+/*
+ * ---------------------------------------------------------
+ * SEARCH ACADEMIC PAPERS
+ * ---------------------------------------------------------
+ */
 
-    /*
-     * 25 candidates is enough for
-     * our first result set and is
-     * significantly lighter than
-     * requesting 100.
-     */
-    url.searchParams.set(
-        "per-page",
-        "25"
-    );
+const searchAcademicPapers =
+    async (topic) => {
+        const trimmedTopic =
+            topic?.trim();
 
-    /*
-     * Request only fields that we
-     * actually use.
-     */
-    url.searchParams.set(
-        "select",
-        [
-            "id",
-            "display_name",
-            "publication_year",
-            "doi",
-            "authorships",
-            "primary_location",
-            "open_access",
-            "cited_by_count",
-            "abstract_inverted_index",
-        ].join(",")
-    );
-
-    /*
-     * Prevent an indefinitely slow
-     * OpenAlex request.
-     */
-    const controller =
-        new AbortController();
-
-    const timeout = setTimeout(
-        () => {
-            controller.abort();
-        },
-        15000
-    );
-
-    let response;
-
-    try {
-        response = await fetch(
-            url,
-            {
-                signal:
-                    controller.signal,
-            }
-        );
-    } catch (error) {
-        if (
-            error?.name ===
-            "AbortError"
-        ) {
+        if (!trimmedTopic) {
             throw new Error(
-                "OpenAlex request timed out. Please try again."
+                "Research topic is required"
             );
         }
 
-        throw error;
-    } finally {
-        clearTimeout(timeout);
-    }
-
-    if (!response.ok) {
-        throw new Error(
-            `OpenAlex request failed with status ${response.status}`
-        );
-    }
-
-    const data =
-        await response.json();
-
-    const results =
-        data.results || [];
-
-    /*
-     * Score candidates.
-     *
-     * Important terms are reused
-     * instead of recalculated for
-     * every paper.
-     */
-    const scoredResults =
-        results.map((paper) => ({
-            ...paper,
-
-            relevanceScore:
-                calculateRelevanceScore(
-                    paper,
-                    trimmedTopic,
-                    importantTerms
-                ),
-        }));
-
-    /*
-     * Remove weak results and sort
-     * strongest results first.
-     */
-    const relevantResults =
-        scoredResults
-            .filter(
-                (paper) =>
-                    paper.relevanceScore >=
-                    0.25
-            )
-            .sort(
-                (a, b) =>
-                    b.relevanceScore -
-                    a.relevanceScore
+        /*
+         * Build topic terms once.
+         */
+        const topicTerms =
+            buildImportantTerms(
+                trimmedTopic
             );
 
-    /*
-     * Return the strongest 25.
-     */
-    return relevantResults.slice(
-        0,
-        25
-    );
-};
+        /*
+         * OpenAlex URL
+         */
+        const url = new URL(
+            OPENALEX_API_URL
+        );
 
-const normalizeAcademicPaper = (
-    paper
-) => {
-    const source =
-        paper.primary_location?.source;
+        /*
+         * Full-text academic search.
+         */
+        url.searchParams.set(
+            "search",
+            trimmedTopic
+        );
 
-    const authors =
-        (paper.authorships || [])
-            .map(
-                (authorship) =>
-                    authorship.author
-                        ?.display_name
+        /*
+         * We only need enough candidates
+         * to find the strongest papers.
+         *
+         * 25 is significantly lighter than
+         * fetching 100 and processing all
+         * their abstracts.
+         */
+        url.searchParams.set(
+            "per-page",
+            "25"
+        );
+
+        /*
+         * Only request fields that
+         * our application actually uses.
+         */
+        url.searchParams.set(
+            "select",
+            [
+                "id",
+                "display_name",
+                "publication_year",
+                "doi",
+                "authorships",
+                "primary_location",
+                "open_access",
+                "cited_by_count",
+                "abstract_inverted_index",
+            ].join(",")
+        );
+
+        /*
+         * Fetch from OpenAlex with
+         * timeout + retry protection.
+         */
+        const data =
+            await fetchOpenAlex(
+                url.toString(),
+                3
+            );
+
+        const results =
+            Array.isArray(
+                data?.results
             )
-            .filter(Boolean);
+                ? data.results
+                : [];
 
-    return {
-        openAlexId:
-            paper.id,
+        /*
+         * Calculate relevance.
+         */
+        const scoredResults =
+            results.map(
+                (paper) => ({
+                    ...paper,
 
-        title:
-            paper.display_name ||
-            "Untitled paper",
+                    relevanceScore:
+                        calculateRelevanceScore(
+                            paper,
+                            topicTerms
+                        ),
+                })
+            );
 
-        abstract:
-            reconstructAbstract(
-                paper.abstract_inverted_index
-            ),
+        /*
+         * Remove weak results.
+         */
+        const relevantResults =
+            scoredResults
+                .filter(
+                    (paper) =>
+                        paper.relevanceScore >=
+                        0.25
+                )
+                .sort(
+                    (a, b) =>
+                        b.relevanceScore -
+                        a.relevanceScore
+                );
 
-        publicationYear:
-            paper.publication_year ||
-            null,
-
-        doi:
-            paper.doi || "",
-
-        authors,
-
-        journal:
-            source?.display_name ||
-            "",
-
-        sourceUrl:
-            paper.primary_location
-                ?.landing_page_url ||
-            paper.primary_location
-                ?.pdf_url ||
-            "",
-
-        citationCount:
-            paper.cited_by_count || 0,
-
-        isOpenAccess:
-            paper.open_access?.is_oa ||
-            false,
-
-        relevanceScore:
-            Number(
-                (
-                    paper.relevanceScore ||
-                    0
-                ).toFixed(3)
-            ),
+        /*
+         * Return strongest 25.
+         */
+        return relevantResults.slice(
+            0,
+            25
+        );
     };
-};
+
+/*
+ * ---------------------------------------------------------
+ * NORMALIZE ACADEMIC PAPER
+ * ---------------------------------------------------------
+ */
+
+const normalizeAcademicPaper =
+    (paper) => {
+        const source =
+            paper.primary_location
+                ?.source;
+
+        const authors =
+            (
+                paper.authorships ||
+                []
+            )
+                .map(
+                    (authorship) =>
+                        authorship
+                            .author
+                            ?.display_name
+                )
+                .filter(Boolean);
+
+        return {
+            openAlexId:
+                paper.id,
+
+            title:
+                paper.display_name ||
+                "Untitled paper",
+
+            abstract:
+                reconstructAbstract(
+                    paper.abstract_inverted_index
+                ),
+
+            publicationYear:
+                paper.publication_year ||
+                null,
+
+            doi:
+                paper.doi || "",
+
+            authors,
+
+            journal:
+                source?.display_name ||
+                "",
+
+            sourceUrl:
+                paper.primary_location
+                    ?.landing_page_url ||
+                paper.primary_location
+                    ?.pdf_url ||
+                "",
+
+            citationCount:
+                paper.cited_by_count ||
+                0,
+
+            isOpenAccess:
+                paper.open_access
+                    ?.is_oa ||
+                false,
+
+            relevanceScore:
+                Number(
+                    (
+                        paper.relevanceScore ||
+                        0
+                    ).toFixed(3)
+                ),
+        };
+    };
+
+/*
+ * ---------------------------------------------------------
+ * EXPORTS
+ * ---------------------------------------------------------
+ */
 
 module.exports = {
     searchAcademicPapers,
