@@ -101,6 +101,10 @@ const typeDefs = `
             researchId: ID!
         ): ResearchSearchResult!
 
+        analyzePaper(
+            paperId: ID!
+        ): Paper!
+
         deleteResearch(
             researchId: ID!
         ): Boolean!
