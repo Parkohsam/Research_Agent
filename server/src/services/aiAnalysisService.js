@@ -20,7 +20,10 @@ const analyzePaperWithAI = async ({
     title,
     abstract,
 }) => {
-    if (!abstract || !abstract.trim()) {
+    if (
+        !abstract ||
+        !abstract.trim()
+    ) {
         throw new Error(
             "This paper does not have an abstract available for AI analysis."
         );
@@ -67,16 +70,19 @@ Rules:
 - Return JSON only.
 `;
 
-    const ollamaUrl = isProduction
-        ? CLOUD_OLLAMA_URL
-        : LOCAL_OLLAMA_URL;
+    const ollamaUrl =
+        isProduction
+            ? CLOUD_OLLAMA_URL
+            : LOCAL_OLLAMA_URL;
 
-    const model = isProduction
-        ? CLOUD_MODEL
-        : LOCAL_MODEL;
+    const model =
+        isProduction
+            ? CLOUD_MODEL
+            : LOCAL_MODEL;
 
     const headers = {
-        "Content-Type": "application/json",
+        "Content-Type":
+            "application/json",
     };
 
     if (isProduction) {
@@ -94,19 +100,26 @@ Rules:
     }
 
     console.log(
-        `AI analysis using ${isProduction ? "Ollama Cloud" : "local Ollama"}`
+        `AI analysis using ${
+            isProduction
+                ? "Ollama Cloud"
+                : "local Ollama"
+        }`
     );
 
     const response = await fetch(
         ollamaUrl,
         {
             method: "POST",
+
             headers,
+
             body: JSON.stringify({
                 model,
                 prompt,
                 stream: false,
                 format: "json",
+
                 options: {
                     temperature: 0.2,
                 },

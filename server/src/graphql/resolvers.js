@@ -12,16 +12,17 @@ const {
 } = require("../services/academicSearchService");
 
 const {
-    analyzePaperWithAI,
-} = require("../services/aiAnalysisService");
-
-const {
     validateResearchTopic,
 } = require("../services/topicValidationService");
 
+const {
+    analyzePaperWithAI,
+} = require("../services/aiAnalysisService");
+
 const resolvers = {
     User: {
-        id: (user) => user._id.toString(),
+        id: (user) =>
+            user._id.toString(),
 
         createdAt: (user) =>
             user.createdAt.toISOString(),
@@ -202,7 +203,8 @@ const resolvers = {
             }
 
             return Research.create({
-                userId: context.user._id,
+                userId:
+                    context.user._id,
                 title,
                 status: "pending",
             });
@@ -245,9 +247,7 @@ const resolvers = {
                         normalizeAcademicPaper
                     );
 
-                for (
-                    const paper of normalizedPapers
-                ) {
+                for (const paper of normalizedPapers) {
                     await Paper.findOneAndUpdate(
                         {
                             researchId:
@@ -328,7 +328,7 @@ const resolvers = {
 
             if (!research) {
                 throw new Error(
-                    "You do not have access to this paper."
+                    "You are not authorized to analyze this paper."
                 );
             }
 
@@ -357,9 +357,6 @@ const resolvers = {
                 paper.aiScore =
                     analysis.score;
 
-                paper.relevanceScore =
-                    analysis.score;
-
                 paper.aiSummary =
                     analysis.summary;
 
@@ -375,9 +372,44 @@ const resolvers = {
                 paper.aiAnalyzedAt =
                     new Date();
 
+                if (
+                    analysis.score >= 80
+                ) {
+                    paper.evaluationStatus =
+                        "recommended";
+                } else if (
+                    analysis.score >= 60
+                ) {
+                    paper.evaluationStatus =
+                        "candidate";
+                } else {
+                    paper.evaluationStatus =
+                        "rejected";
+                }
+
                 await paper.save();
 
-                return paper;
+                return {
+                    id: paper._id.toString(),
+
+                    score:
+                        analysis.score,
+
+                    summary:
+                        analysis.summary,
+
+                    relevance:
+                        analysis.relevance,
+
+                    keyFindings:
+                        analysis.keyFindings,
+
+                    methodology:
+                        analysis.methodology,
+
+                    analyzedAt:
+                        paper.aiAnalyzedAt.toISOString(),
+                };
             } catch (error) {
                 console.error(
                     "Paper AI analysis failed:",
@@ -385,7 +417,8 @@ const resolvers = {
                 );
 
                 throw new Error(
-                    "Unable to analyze paper with AI."
+                    error.message ||
+                        "Unable to analyze paper with AI."
                 );
             }
         },
