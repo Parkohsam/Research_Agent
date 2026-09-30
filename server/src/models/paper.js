@@ -58,6 +58,11 @@ const paperSchema = new mongoose.Schema(
             default: false,
         },
 
+        relevanceScore: {
+            type: Number,
+            default: null,
+        },
+
         evaluationStatus: {
             type: String,
             enum: [
@@ -74,12 +79,6 @@ const paperSchema = new mongoose.Schema(
             default: null,
         },
 
-        relevanceScore: {
-            type: Number,
-            default: null,
-        },
-
-        // AI-generated analysis
         aiSummary: {
             type: String,
             default: "",

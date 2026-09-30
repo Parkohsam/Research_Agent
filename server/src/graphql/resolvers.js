@@ -12,16 +12,22 @@ const {
 } = require("../services/academicSearchService");
 
 const {
-    validateResearchTopic,
-} = require("../services/topicValidationService");
-
-const {
     analyzePaperWithAI,
 } = require("../services/aiAnalysisService");
+
+const {
+    validateResearchTopic,
+} = require("../services/topicValidationService");
 
 const resolvers = {
     User: {
         id: (user) => user._id.toString(),
+
+        createdAt: (user) =>
+            user.createdAt.toISOString(),
+
+        updatedAt: (user) =>
+            user.updatedAt.toISOString(),
     },
 
     Research: {
@@ -60,6 +66,11 @@ const resolvers = {
 
         updatedAt: (paper) =>
             paper.updatedAt.toISOString(),
+
+        aiAnalyzedAt: (paper) =>
+            paper.aiAnalyzedAt
+                ? paper.aiAnalyzedAt.toISOString()
+                : null,
     },
 
     Query: {
@@ -191,8 +202,7 @@ const resolvers = {
             }
 
             return Research.create({
-                userId:
-                    context.user._id,
+                userId: context.user._id,
                 title,
                 status: "pending",
             });
@@ -210,8 +220,7 @@ const resolvers = {
             const research =
                 await Research.findOne({
                     _id: args.researchId,
-                    userId:
-                        context.user._id,
+                    userId: context.user._id,
                 });
 
             if (!research) {
@@ -236,7 +245,9 @@ const resolvers = {
                         normalizeAcademicPaper
                     );
 
-                for (const paper of normalizedPapers) {
+                for (
+                    const paper of normalizedPapers
+                ) {
                     await Paper.findOneAndUpdate(
                         {
                             researchId:
@@ -312,13 +323,12 @@ const resolvers = {
             const research =
                 await Research.findOne({
                     _id: paper.researchId,
-                    userId:
-                        context.user._id,
+                    userId: context.user._id,
                 });
 
             if (!research) {
                 throw new Error(
-                    "You are not authorized to analyze this paper."
+                    "You do not have access to this paper."
                 );
             }
 
@@ -330,11 +340,6 @@ const resolvers = {
                     "This paper does not have an abstract available for AI analysis."
                 );
             }
-
-            paper.evaluationStatus =
-                "analyzing";
-
-            await paper.save();
 
             try {
                 const analysis =
@@ -352,6 +357,9 @@ const resolvers = {
                 paper.aiScore =
                     analysis.score;
 
+                paper.relevanceScore =
+                    analysis.score;
+
                 paper.aiSummary =
                     analysis.summary;
 
@@ -367,18 +375,10 @@ const resolvers = {
                 paper.aiAnalyzedAt =
                     new Date();
 
-                paper.evaluationStatus =
-                    "completed";
-
                 await paper.save();
 
                 return paper;
             } catch (error) {
-                paper.evaluationStatus =
-                    "failed";
-
-                await paper.save();
-
                 console.error(
                     "Paper AI analysis failed:",
                     error
@@ -402,8 +402,7 @@ const resolvers = {
             const research =
                 await Research.findOne({
                     _id: args.researchId,
-                    userId:
-                        context.user._id,
+                    userId: context.user._id,
                 });
 
             if (!research) {
