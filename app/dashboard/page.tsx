@@ -8,7 +8,7 @@ import Sidebar from "../components/dashboard/Sidebar";
 import ResearchInput from "../components/dashboard/ResearchInput";
 import ResearchSuggestions from "../components/dashboard/ResearchSuggestions";
 
-import {getCurrentUser,getMyResearch,getResearchPapers,createResearch,searchResearchPapers,deleteResearch,analyzePaper,type Research,type Paper,} from "@/lib/graphql";
+import { getCurrentUser, getMyResearch, getResearchPapers, createResearch, searchResearchPapers, deleteResearch, analyzePaper, type Research, type Paper, } from "@/lib/graphql";
 
 const PAPERS_PER_PAGE = 5;
 
@@ -429,6 +429,8 @@ export default function DashboardPage() {
         }
     };
 
+
+
     /* ========================================= */
     /* Analyze Paper With AI                     */
     /* ========================================= */
@@ -473,37 +475,41 @@ export default function DashboardPage() {
                     previousPapers.map(
                         (currentPaper) =>
                             currentPaper.id ===
-                            paper.id
+                                paper.id
                                 ? {
-                                      ...currentPaper,
+                                    ...currentPaper,
 
-                                      aiScore:
-                                          analysis.score,
+                                    aiScore:
+                                        analysis.aiScore,
 
-                                      aiSummary:
-                                          analysis.summary,
+                                    aiSummary:
+                                        analysis.aiSummary,
 
-                                      aiRelevance:
-                                          analysis.relevance,
+                                    aiRelevance:
+                                        analysis.aiRelevance,
 
-                                      aiKeyFindings:
-                                          analysis.keyFindings,
+                                    aiKeyFindings:
+                                        analysis.aiKeyFindings,
 
-                                      aiMethodology:
-                                          analysis.methodology,
+                                    aiMethodology:
+                                        analysis.aiMethodology,
 
-                                      aiAnalyzedAt:
-                                          new Date().toISOString(),
+                                    aiAnalyzedAt:
+                                        analysis.aiAnalyzedAt,
 
-                                      evaluationStatus:
-                                          analysis.score >=
-                                          80
-                                              ? "recommended"
-                                              : analysis.score >=
-                                                  60
-                                              ? "candidate"
-                                              : "rejected",
-                                  }
+                                    evaluationStatus:
+                                        analysis.aiScore !==
+                                            null &&
+                                            analysis.aiScore >=
+                                            80
+                                            ? "recommended"
+                                            : analysis.aiScore !==
+                                                null &&
+                                                analysis.aiScore >=
+                                                60
+                                                ? "candidate"
+                                                : "rejected",
+                                }
                                 : currentPaper
                     )
             );
@@ -556,7 +562,7 @@ export default function DashboardPage() {
             if (
                 currentResearch &&
                 currentResearch.id ===
-                    research.id
+                research.id
             ) {
                 setCurrentResearch(null);
 
@@ -681,8 +687,8 @@ export default function DashboardPage() {
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-xs font-semibold text-white md:hidden">
                             {userName
                                 ? userName
-                                      .charAt(0)
-                                      .toUpperCase()
+                                    .charAt(0)
+                                    .toUpperCase()
                                 : "U"}
                         </div>
                     </div>
@@ -808,7 +814,7 @@ export default function DashboardPage() {
                                 {/* ================================= */}
 
                                 {papers.length ===
-                                0 ? (
+                                    0 ? (
                                     <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
                                         <p className="text-sm text-gray-600">
                                             No research
@@ -888,7 +894,7 @@ export default function DashboardPage() {
                                                             {paper.aiScore !==
                                                                 null &&
                                                                 paper.aiScore !==
-                                                                    undefined && (
+                                                                undefined && (
                                                                     <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
                                                                         AI
                                                                         Score:{" "}
@@ -906,15 +912,15 @@ export default function DashboardPage() {
                                                     {paper.authors
                                                         .length >
                                                         0 && (
-                                                        <p className="mt-4 break-words text-sm leading-6 text-gray-600">
-                                                            <span className="font-medium text-gray-800">
-                                                                Authors:
-                                                            </span>{" "}
-                                                            {paper.authors.join(
-                                                                ", "
-                                                            )}
-                                                        </p>
-                                                    )}
+                                                            <p className="mt-4 break-words text-sm leading-6 text-gray-600">
+                                                                <span className="font-medium text-gray-800">
+                                                                    Authors:
+                                                                </span>{" "}
+                                                                {paper.authors.join(
+                                                                    ", "
+                                                                )}
+                                                            </p>
+                                                        )}
 
                                                     {/* Abstract */}
 
@@ -989,14 +995,14 @@ export default function DashboardPage() {
                                                                 className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-indigo-600 px-4 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                                                             >
                                                                 {analyzingPaperId ===
-                                                                paper.id
+                                                                    paper.id
                                                                     ? "Analyzing..."
                                                                     : paper.aiScore !==
-                                                                          null &&
-                                                                      paper.aiScore !==
-                                                                          undefined
-                                                                    ? "Analyze Again"
-                                                                    : "Analyze with AI"}
+                                                                        null &&
+                                                                        paper.aiScore !==
+                                                                        undefined
+                                                                        ? "Analyze Again"
+                                                                        : "Analyze with AI"}
                                                             </button>
                                                         )}
                                                     </div>
@@ -1019,7 +1025,7 @@ export default function DashboardPage() {
                                                                 {paper.aiScore !==
                                                                     null &&
                                                                     paper.aiScore !==
-                                                                        undefined && (
+                                                                    undefined && (
                                                                         <span className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white">
                                                                             {Math.round(
                                                                                 paper.aiScore
@@ -1069,7 +1075,7 @@ export default function DashboardPage() {
                                                                 paper
                                                                     .aiKeyFindings
                                                                     .length >
-                                                                    0 && (
+                                                                0 && (
                                                                     <div className="mb-4">
                                                                         <h5 className="mb-2 text-sm font-semibold text-gray-800">
                                                                             Key
@@ -1125,7 +1131,7 @@ export default function DashboardPage() {
 
                                 {hasMorePapers &&
                                     papers.length >
-                                        0 && (
+                                    0 && (
                                         <div className="mt-8 flex justify-center">
                                             <button
                                                 type="button"
@@ -1150,7 +1156,7 @@ export default function DashboardPage() {
 
                                 {!hasMorePapers &&
                                     papers.length >
-                                        0 && (
+                                    0 && (
                                         <p className="mt-6 text-center text-sm text-gray-500">
                                             All available
                                             papers have

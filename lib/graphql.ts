@@ -75,6 +75,7 @@ export async function graphqlRequest<T>(
     }
 }
 
+
 /* ---------------------------------- */
 /* Authentication                     */
 /* ---------------------------------- */
@@ -111,7 +112,6 @@ export async function signupUser(
                 password: $password
             ) {
                 token
-
                 user {
                     id
                     name
@@ -132,6 +132,7 @@ export async function signupUser(
         }
     );
 }
+
 
 export type LoginResponse = {
     login: {
@@ -154,7 +155,6 @@ export async function loginUser(
                 password: $password
             ) {
                 token
-
                 user {
                     id
                     name
@@ -174,6 +174,7 @@ export async function loginUser(
         }
     );
 }
+
 
 export type MeResponse = {
     me: AuthUser;
@@ -202,6 +203,7 @@ export async function getCurrentUser(
         }
     );
 }
+
 
 /* ---------------------------------- */
 /* Academic Papers                    */
@@ -241,6 +243,7 @@ export type Paper = {
     updatedAt: string;
 };
 
+
 /* ---------------------------------- */
 /* Research                           */
 /* ---------------------------------- */
@@ -277,6 +280,27 @@ export async function createResearch(
 
                 papers {
                     id
+                    researchId
+                    openAlexId
+                    title
+                    abstract
+                    publicationYear
+                    doi
+                    authors
+                    journal
+                    sourceUrl
+                    citationCount
+                    isOpenAccess
+                    evaluationStatus
+                    aiScore
+                    relevanceScore
+                    aiSummary
+                    aiRelevance
+                    aiKeyFindings
+                    aiMethodology
+                    aiAnalyzedAt
+                    createdAt
+                    updatedAt
                 }
 
                 createdAt
@@ -296,6 +320,7 @@ export async function createResearch(
     );
 }
 
+
 export type MyResearchResponse = {
     myResearch: Research[];
 };
@@ -313,6 +338,27 @@ export async function getMyResearch(
 
                 papers {
                     id
+                    researchId
+                    openAlexId
+                    title
+                    abstract
+                    publicationYear
+                    doi
+                    authors
+                    journal
+                    sourceUrl
+                    citationCount
+                    isOpenAccess
+                    evaluationStatus
+                    aiScore
+                    relevanceScore
+                    aiSummary
+                    aiRelevance
+                    aiKeyFindings
+                    aiMethodology
+                    aiAnalyzedAt
+                    createdAt
+                    updatedAt
                 }
 
                 createdAt
@@ -329,6 +375,7 @@ export async function getMyResearch(
         }
     );
 }
+
 
 /* ---------------------------------- */
 /* Search Research Papers             */
@@ -368,6 +415,7 @@ export async function searchResearchPapers(
         }
     );
 }
+
 
 /* ---------------------------------- */
 /* Get Research Papers                */
@@ -456,22 +504,25 @@ export async function getResearchPapers(
     );
 }
 
+
 /* ---------------------------------- */
 /* AI Paper Analysis                  */
 /* ---------------------------------- */
 
 export type PaperAIAnalysis = {
-    paperId: string;
+    id: string;
 
-    score: number;
+    aiScore: number | null;
 
-    summary: string;
+    aiSummary: string | null;
 
-    relevance: string;
+    aiRelevance: string | null;
 
-    keyFindings: string[];
+    aiKeyFindings: string[];
 
-    methodology: string;
+    aiMethodology: string | null;
+
+    aiAnalyzedAt: string | null;
 };
 
 export type AnalyzePaperResponse = {
@@ -489,12 +540,13 @@ export async function analyzePaper(
             analyzePaper(
                 paperId: $paperId
             ) {
-                paperId
-                score
-                summary
-                relevance
-                keyFindings
-                methodology
+                id
+                aiScore
+                aiSummary
+                aiRelevance
+                aiKeyFindings
+                aiMethodology
+                aiAnalyzedAt
             }
         }
     `;
@@ -509,6 +561,7 @@ export async function analyzePaper(
         }
     );
 }
+
 
 /* ---------------------------------- */
 /* Delete Research                    */
