@@ -509,20 +509,18 @@ export async function getResearchPapers(
 /* AI Paper Analysis                  */
 /* ---------------------------------- */
 
+/* ---------------------------------- */
+/* AI Paper Analysis                  */
+/* ---------------------------------- */
+
 export type PaperAIAnalysis = {
-    id: string;
-
-    aiScore: number | null;
-
-    aiSummary: string | null;
-
-    aiRelevance: string | null;
-
-    aiKeyFindings: string[];
-
-    aiMethodology: string | null;
-
-    aiAnalyzedAt: string | null;
+    paperId: string;
+    score: number;
+    summary: string;
+    relevance: string;
+    keyFindings: string[];
+    methodology: string;
+    analyzedAt: string | null;
 };
 
 export type AnalyzePaperResponse = {
@@ -540,13 +538,13 @@ export async function analyzePaper(
             analyzePaper(
                 paperId: $paperId
             ) {
-                id
-                aiScore
-                aiSummary
-                aiRelevance
-                aiKeyFindings
-                aiMethodology
-                aiAnalyzedAt
+                paperId
+                score
+                summary
+                relevance
+                keyFindings
+                methodology
+                analyzedAt
             }
         }
     `;
@@ -561,7 +559,6 @@ export async function analyzePaper(
         }
     );
 }
-
 
 /* ---------------------------------- */
 /* Delete Research                    */

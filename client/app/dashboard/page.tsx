@@ -435,100 +435,158 @@ export default function DashboardPage() {
     /* Analyze Paper With AI                     */
     /* ========================================= */
 
-    const handleAnalyzePaper = async (
-        paper: Paper
-    ) => {
-        const token =
-            localStorage.getItem("token");
+   const handleAnalyzePaper = async (
+    paper: Paper
+) => {
+    const token =
+        localStorage.getItem("token");
 
-        if (!token) {
-            router.push("/login");
-            return;
+    if (!token) {
+        router.push("/login");
+        return;
+    }
+
+    if (!paper?.id) {
+        setAiError(
+            "This paper does not have a valid ID for AI analysis."
+        );
+        return;
+    }
+
+    if (!paper.abstract?.trim()) {
+        setAiError(
+            "This paper does not have an abstract available for AI analysis."
+        );
+        return;
+    }
+
+    try {
+        setAnalyzingPaperId(
+            paper.id
+        );
+
+        setAiError("");
+
+        console.log(
+            "Analyzing paper:",
+            {
+                id: paper.id,
+                title: paper.title,
+                abstract:
+                    paper.abstract.substring(
+                        0,
+                        100
+                    ),
+            }
+        );
+
+        const response =
+            await analyzePaper(
+                paper.id,
+                token
+            );
+
+        console.log(
+            "AI analysis response:",
+            response
+        );
+
+        if (!response) {
+            throw new Error(
+                "No response was received from the server."
+            );
         }
 
-        if (!paper.abstract?.trim()) {
+        const analysis =
+            response.analyzePaper;
+
+        if (!analysis) {
+            throw new Error(
+                "The server did not return an AI analysis for this paper."
+            );
+        }
+
+        const score =
+            Number(analysis.score);
+
+        if (
+            Number.isNaN(score) ||
+            score < 0 ||
+            score > 100
+        ) {
+            throw new Error(
+                "The AI returned an invalid relevance score."
+            );
+        }
+
+        setPapers(
+            (previousPapers) =>
+                previousPapers.map(
+                    (currentPaper) => {
+                        if (
+                            currentPaper.id !==
+                            paper.id
+                        ) {
+                            return currentPaper;
+                        }
+
+                        return {
+                            ...currentPaper,
+
+                            aiScore:
+                                score,
+
+                            aiSummary:
+                                analysis.summary ??
+                                "",
+
+                            aiRelevance:
+                                analysis.relevance ??
+                                "",
+
+                            aiKeyFindings:
+                                analysis.keyFindings ??
+                                [],
+
+                            aiMethodology:
+                                analysis.methodology ??
+                                "",
+
+                            aiAnalyzedAt:
+                                analysis.analyzedAt ??
+                                null,
+
+                            evaluationStatus:
+                                score >= 80
+                                    ? "recommended"
+                                    : score >= 60
+                                    ? "candidate"
+                                    : "rejected",
+                        };
+                    }
+                )
+        );
+    } catch (error) {
+        console.error(
+            "Failed to analyze paper:",
+            error
+        );
+
+        if (error instanceof Error) {
             setAiError(
-                "This paper does not have an abstract available for AI analysis."
+                error.message
             );
-
-            return;
-        }
-
-        try {
-            setAnalyzingPaperId(
-                paper.id
-            );
-
-            setAiError("");
-
-            const response =
-                await analyzePaper(
-                    paper.id,
-                    token
-                );
-
-            const analysis =
-                response.analyzePaper;
-
-            setPapers(
-                (previousPapers) =>
-                    previousPapers.map(
-                        (currentPaper) =>
-                            currentPaper.id ===
-                                paper.id
-                                ? {
-                                    ...currentPaper,
-
-                                    aiScore:
-                                        analysis.aiScore,
-
-                                    aiSummary:
-                                        analysis.aiSummary,
-
-                                    aiRelevance:
-                                        analysis.aiRelevance,
-
-                                    aiKeyFindings:
-                                        analysis.aiKeyFindings,
-
-                                    aiMethodology:
-                                        analysis.aiMethodology,
-
-                                    aiAnalyzedAt:
-                                        analysis.aiAnalyzedAt,
-
-                                    evaluationStatus:
-                                        analysis.aiScore !==
-                                            null &&
-                                            analysis.aiScore >=
-                                            80
-                                            ? "recommended"
-                                            : analysis.aiScore !==
-                                                null &&
-                                                analysis.aiScore >=
-                                                60
-                                                ? "candidate"
-                                                : "rejected",
-                                }
-                                : currentPaper
-                    )
-            );
-        } catch (error) {
-            console.error(
-                "Failed to analyze paper:",
-                error
-            );
-
+        } else {
             setAiError(
-                error instanceof Error
-                    ? error.message
-                    : "Unable to analyze this paper with AI."
+                "Unable to analyze this paper with AI."
             );
-        } finally {
-            setAnalyzingPaperId(null);
         }
-    };
-
+    } finally {
+        setAnalyzingPaperId(
+            null
+        );
+    }
+};
     /* ========================================= */
     /* Delete Research                           */
     /* ========================================= */
