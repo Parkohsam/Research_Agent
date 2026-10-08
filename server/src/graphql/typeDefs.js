@@ -69,6 +69,16 @@ const typeDefs = `
         user: User!
     }
 
+    type PaperAIAnalysis {
+        paperId: ID!
+        score: Float!
+        summary: String!
+        relevance: String!
+        keyFindings: [String!]!
+        methodology: String!
+        analyzedAt: String
+    }
+
     type Query {
         hello: String
         me: User
@@ -103,7 +113,7 @@ const typeDefs = `
 
         analyzePaper(
             paperId: ID!
-        ): Paper!
+        ): PaperAIAnalysis!
 
         deleteResearch(
             researchId: ID!

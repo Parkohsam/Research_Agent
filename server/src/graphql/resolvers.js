@@ -300,13 +300,19 @@ const resolvers = {
             }
         },
 
-        analyzePaper: async (
+                analyzePaper: async (
             _,
             args,
             context
         ) => {
             if (!context.user) {
                 throw new Error("Unauthorized");
+            }
+
+            if (!args.paperId) {
+                throw new Error(
+                    "Paper ID is required."
+                );
             }
 
             const paper =
@@ -316,7 +322,7 @@ const resolvers = {
 
             if (!paper) {
                 throw new Error(
-                    "Paper not found"
+                    "Paper not found."
                 );
             }
 
@@ -354,32 +360,59 @@ const resolvers = {
                             paper.abstract,
                     });
 
-                paper.aiScore =
-                    analysis.score;
+                const score =
+                    Number(analysis.score);
+
+                if (
+                    Number.isNaN(score) ||
+                    score < 0 ||
+                    score > 100
+                ) {
+                    throw new Error(
+                        "The AI returned an invalid relevance score."
+                    );
+                }
+
+                paper.aiScore = score;
 
                 paper.aiSummary =
-                    analysis.summary;
+                    typeof analysis.summary ===
+                    "string"
+                        ? analysis.summary
+                        : "";
 
                 paper.aiRelevance =
-                    analysis.relevance;
+                    typeof analysis.relevance ===
+                    "string"
+                        ? analysis.relevance
+                        : "";
 
                 paper.aiKeyFindings =
-                    analysis.keyFindings;
+                    Array.isArray(
+                        analysis.keyFindings
+                    )
+                        ? analysis.keyFindings
+                              .filter(
+                                  (finding) =>
+                                      typeof finding ===
+                                      "string"
+                              )
+                              .slice(0, 5)
+                        : [];
 
                 paper.aiMethodology =
-                    analysis.methodology;
+                    typeof analysis.methodology ===
+                    "string"
+                        ? analysis.methodology
+                        : "";
 
                 paper.aiAnalyzedAt =
                     new Date();
 
-                if (
-                    analysis.score >= 80
-                ) {
+                if (score >= 80) {
                     paper.evaluationStatus =
                         "recommended";
-                } else if (
-                    analysis.score >= 60
-                ) {
+                } else if (score >= 60) {
                     paper.evaluationStatus =
                         "candidate";
                 } else {
@@ -390,25 +423,28 @@ const resolvers = {
                 await paper.save();
 
                 return {
-                    id: paper._id.toString(),
+                    paperId: paper._id
+                        ? paper._id.toString()
+                        : String(args.paperId),
 
-                    score:
-                        analysis.score,
+                    score,
 
                     summary:
-                        analysis.summary,
+                        paper.aiSummary,
 
                     relevance:
-                        analysis.relevance,
+                        paper.aiRelevance,
 
                     keyFindings:
-                        analysis.keyFindings,
+                        paper.aiKeyFindings,
 
                     methodology:
-                        analysis.methodology,
+                        paper.aiMethodology,
 
                     analyzedAt:
-                        paper.aiAnalyzedAt.toISOString(),
+                        paper.aiAnalyzedAt
+                            ? paper.aiAnalyzedAt.toISOString()
+                            : null,
                 };
             } catch (error) {
                 console.error(
@@ -417,8 +453,9 @@ const resolvers = {
                 );
 
                 throw new Error(
-                    error.message ||
-                        "Unable to analyze paper with AI."
+                    error instanceof Error
+                        ? error.message
+                        : "Unable to analyze paper with AI."
                 );
             }
         },
