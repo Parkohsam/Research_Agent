@@ -210,97 +210,91 @@ const resolvers = {
             });
         },
 
-        searchResearchPapers: async (
-            _,
-            args,
-            context
-        ) => {
+
+        searchResearchPapers: async (_, args, context) => {
             if (!context.user) {
                 throw new Error("Unauthorized");
             }
 
-            const research =
-                await Research.findOne({
-                    _id: args.researchId,
-                    userId: context.user._id,
-                });
+            const research = await Research.findOne({
+                _id: args.researchId,
+                userId: context.user._id,
+            });
 
             if (!research) {
-                throw new Error(
-                    "Research not found"
-                );
+                throw new Error("Research not found");
             }
 
-            research.status =
-                "processing";
-
+            research.status = "processing";
             await research.save();
 
             try {
+                console.log(
+                    "Starting academic paper search:",
+                    research.title
+                );
+
                 const academicPapers =
-                    await searchAcademicPapers(
-                        research.title
-                    );
+                    await searchAcademicPapers(research.title);
 
                 const normalizedPapers =
-                    academicPapers.map(
-                        normalizeAcademicPaper
-                    );
+                    academicPapers.map(normalizeAcademicPaper);
 
-                for (const paper of normalizedPapers) {
-                    await Paper.findOneAndUpdate(
-                        {
-                            researchId:
-                                research._id,
+                console.log(
+                    `OpenAlex returned ${normalizedPapers.length} relevant papers.`
+                );
 
-                            openAlexId:
-                                paper.openAlexId,
-                        },
-                        {
-                            researchId:
-                                research._id,
-
-                            ...paper,
-                        },
-                        {
-                            upsert: true,
-                            new: true,
-                            setDefaultsOnInsert:
-                                true,
-                        }
+                if (normalizedPapers.length > 0) {
+                    await Paper.bulkWrite(
+                        normalizedPapers.map((paper) => ({
+                            updateOne: {
+                                filter: {
+                                    researchId: research._id,
+                                    openAlexId: paper.openAlexId,
+                                },
+                                update: {
+                                    $set: {
+                                        researchId: research._id,
+                                        ...paper,
+                                    },
+                                },
+                                upsert: true,
+                            },
+                        })),
+                        { ordered: false }
                     );
                 }
 
-                research.status =
-                    "completed";
-
+                research.status = "completed";
                 await research.save();
+
+                console.log(
+                    `Paper search completed for research ${research._id}.`
+                );
 
                 return {
-                    researchId:
-                        research._id.toString(),
-
-                    totalFound:
-                        normalizedPapers.length,
+                    researchId: research._id.toString(),
+                    totalFound: normalizedPapers.length,
                 };
             } catch (error) {
-                research.status =
-                    "failed";
-
-                await research.save();
-
                 console.error(
                     "Research paper search failed:",
                     error
                 );
 
+                research.status = "failed";
+                await research.save();
+
                 throw new Error(
-                    "Unable to search and save academic papers."
+                    error instanceof Error
+                        ? error.message
+                        : "Unable to search and save academic papers."
                 );
             }
         },
 
-                analyzePaper: async (
+
+        analyzePaper: async (
             _,
             args,
             context
@@ -377,13 +371,13 @@ const resolvers = {
 
                 paper.aiSummary =
                     typeof analysis.summary ===
-                    "string"
+                        "string"
                         ? analysis.summary
                         : "";
 
                 paper.aiRelevance =
                     typeof analysis.relevance ===
-                    "string"
+                        "string"
                         ? analysis.relevance
                         : "";
 
@@ -392,17 +386,17 @@ const resolvers = {
                         analysis.keyFindings
                     )
                         ? analysis.keyFindings
-                              .filter(
-                                  (finding) =>
-                                      typeof finding ===
-                                      "string"
-                              )
-                              .slice(0, 5)
+                            .filter(
+                                (finding) =>
+                                    typeof finding ===
+                                    "string"
+                            )
+                            .slice(0, 5)
                         : [];
 
                 paper.aiMethodology =
                     typeof analysis.methodology ===
-                    "string"
+                        "string"
                         ? analysis.methodology
                         : "";
 
